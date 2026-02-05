@@ -10,6 +10,20 @@ from app.core.security import (
 )
 from app.core.deps import get_db, get_current_user, get_current_active_user
 from app.core.authorization import Role, require_admin, require_role, is_admin
+from app.core.logging_config import setup_logging, get_logger
+from app.core.exceptions import (
+    AppException,
+    AuthenticationException,
+    InvalidCredentialsException,
+    InvalidTokenException,
+    InsufficientPermissionsException,
+    ResourceNotFoundException,
+    UserNotFoundException,
+    ValidationException,
+    DuplicateEmailException,
+    BusinessLogicException,
+    DatabaseException
+)
 
 __all__ = [
     "settings",
@@ -25,4 +39,17 @@ __all__ = [
     "require_admin",
     "require_role",
     "is_admin",
+    "setup_logging",
+    "get_logger",
+    "AppException",
+    "AuthenticationException",
+    "InvalidCredentialsException",
+    "InvalidTokenException",
+    "InsufficientPermissionsException",
+    "ResourceNotFoundException",
+    "UserNotFoundException",
+    "ValidationException",
+    "DuplicateEmailException",
+    "BusinessLogicException",
+    "DatabaseException",
 ]

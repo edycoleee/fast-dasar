@@ -1,0 +1,2 @@
+2026-02-05 21:35:41 - __main__ - ERROR - Testing error log
+2026-02-05 21:35:41 - __main__ - ERROR - Caught exception: User with identifier 'ID 123' not found

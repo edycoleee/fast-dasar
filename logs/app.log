@@ -1,0 +1,5 @@
+2026-02-05 21:35:41 - __main__ - INFO - Testing info log
+2026-02-05 21:35:41 - __main__ - WARNING - Testing warning log
+2026-02-05 21:35:41 - __main__ - ERROR - Testing error log
+2026-02-05 21:35:41 - __main__ - ERROR - Caught exception: User with identifier 'ID 123' not found
+2026-02-05 21:38:49 - __main__ - INFO - Test log entry
