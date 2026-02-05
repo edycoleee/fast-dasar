@@ -1,268 +1,282 @@
-# Belajar FastAPI - Panduan Tahapan
+# 🚀 FastAPI Clean Architecture - JWT & RBAC
 
-## 🎯 Untuk Anda yang Sudah Familiar dengan Flask & Node.js
+Aplikasi FastAPI dengan **Clean Architecture** yang mengimplementasikan JWT Authentication dan Role-Based Access Control (RBAC).
 
-FastAPI adalah framework modern Python yang menggabungkan kecepatan Node.js dengan kemudahan Flask, plus type safety dan auto-documentation!
+## ✨ Fitur
 
----
+### Authentication & Authorization
+- ✅ **JWT Authentication** - Token-based authentication dengan expiry
+- ✅ **Password Hashing** - Bcrypt untuk keamanan password
+- ✅ **Role-Based Access Control (RBAC)** - Admin & User roles
+- ✅ **Protected Endpoints** - Endpoint yang memerlukan authentication
 
-## 📚 Tahapan Belajar FastAPI
+### Role Permissions
+- **Admin**: Full CRUD + Manage user roles
+- **User**: Create, Read, Update (No Delete)
 
-### **Tahap 1: Konsep Dasar (Yang Anda Lakukan Sekarang)**
+### Architecture
+- ✅ **Clean Architecture** - Separation of concerns
+- ✅ **Modular Design** - Easy to maintain and scale
+- ✅ **Type Safety** - Pydantic schemas untuk validation
+- ✅ **Docker Ready** - Containerization support
+- ✅ **Auto Documentation** - Swagger & ReDoc
 
-#### Perbedaan dengan Flask & Node.js:
+## 🛠️ Teknologi
 
-| Aspek | Flask | Node.js/Express | FastAPI |
-|-------|-------|-----------------|---------|
-| Type Hints | ❌ Tidak wajib | ❌ Tidak (pakai TS) | ✅ Wajib & otomatis validasi |
-| Async/Await | ⚠️ Manual setup | ✅ Native | ✅ Native |
-| Validasi Data | Manual (Flask-RESTful) | Manual (Joi, etc) | ✅ Otomatis (Pydantic) |
-| Dokumentasi API | Manual (Swagger) | Manual (Swagger) | ✅ Auto-generate |
-| Performance | ~20k req/s | ~30k req/s | ~40k req/s |
+- **FastAPI** 0.109.0 - Modern web framework
+- **SQLAlchemy** 2.0.25 - ORM untuk database
+- **Pydantic** 2.5.3 - Data validation
+- **Pydantic Settings** 2.12.0 - Configuration management
+- **python-jose** 3.3.0 - JWT token generation & validation
+- **passlib** 1.7.4 - Password hashing
+- **bcrypt** - Hashing algorithm
+- **SQLite** - Database (production-ready untuk PostgreSQL)
 
-#### Yang Mirip:
-```python
-# Flask
-@app.route('/api/halo/', methods=['GET'])
-def halo():
-    return {"message": "Halo"}
+## 📁 Struktur Folder
 
-# Express (Node.js)
-app.get('/api/halo/', (req, res) => {
-    res.json({message: "Halo"});
-});
-
-# FastAPI
-@app.get("/api/halo/")
-async def halo():
-    return {"message": "Halo"}
+```
+fast-dasar/
+├── app/                          # Main application
+│   ├── api/                      # API endpoints
+│   │   └── v1/
+│   │       ├── endpoints/        # Route handlers
+│   │       │   ├── auth.py       # Login, logout, dashboard
+│   │       │   ├── users.py      # User CRUD
+│   │       │   └── admin.py      # Admin operations
+│   │       └── api.py            # Router aggregation
+│   │
+│   ├── core/                     # Core functionality
+│   │   ├── config.py             # Settings & configuration
+│   │   ├── security.py           # JWT & password hashing
+│   │   ├── deps.py               # Dependencies (DB, auth)
+│   │   └── authorization.py      # RBAC utilities
+│   │
+│   ├── db/                       # Database
+│   │   ├── base.py               # SQLAlchemy setup
+│   │   └── session.py            # Session management
+│   │
+│   ├── models/                   # SQLAlchemy models
+│   │   └── user.py               # User model
+│   │
+│   ├── schemas/                  # Pydantic schemas
+│   │   ├── user.py               # User schemas
+│   │   └── auth.py               # Auth schemas
+│   │
+│   ├── services/                 # Business logic
+│   │   ├── user_service.py       # User operations
+│   │   └── auth_service.py       # Authentication
+│   │
+│   └── middleware/               # Middleware
+│       └── jwt_middleware.py     # JWT validation
+│
+├── main.py                       # Application entry point
+├── requirements.txt              # Dependencies
+├── .env.example                  # Environment template
+├── Dockerfile                    # Docker configuration
+├── docker-compose.yml            # Docker Compose
+└── test_clean_architecture.py   # API tests
 ```
 
----
+## 📦 Instalasi
 
-### **Tahap 2: Pydantic Models (Keunggulan Utama FastAPI)**
-
-```python
-# Ini yang membedakan FastAPI!
-class HaloRequest(BaseModel):
-    nama: str           # Wajib string
-    handphone: str      # Wajib string
-    umur: int = 0       # Opsional dengan default
-
-# FastAPI otomatis validasi:
-# ✅ Cek tipe data
-# ✅ Convert jika perlu
-# ✅ Return error 422 jika tidak valid
-```
-
-**Bandingkan dengan Flask:**
-```python
-# Flask - manual validation
-data = request.get_json()
-if not data or 'nama' not in data:
-    return {"error": "nama required"}, 400
-nama = data['nama']
-```
-
-**Bandingkan dengan Express:**
-```javascript
-// Express - perlu library tambahan
-const { body, validationResult } = require('express-validator');
-
-app.post('/api/halo/', 
-  body('nama').isString(),
-  (req, res) => {
-    const errors = validationResult(req);
-    // manual handling...
-  }
-);
-```
-
----
-
-### **Tahap 3: Instalasi & Menjalankan**
-
+### 1. Clone Repository
 ```bash
-# 1. Buat virtual environment (best practice)
-python -m venv venv
-source venv/bin/activate  # macOS/Linux
-# venv\Scripts\activate   # Windows
+git clone <repository-url>
+cd fast-dasar
+```
 
-# 2. Install dependencies
+### 2. Create Virtual Environment
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# atau
+venv\Scripts\activate     # Windows
+```
+
+### 3. Install Dependencies
+```bash
 pip install -r requirements.txt
-
-# 3. Jalankan server
-uvicorn main:app --reload
-
-# Server berjalan di: http://127.0.0.1:8000
 ```
 
-**Perbedaan dengan Flask/Node:**
+### 4. Setup Environment
 ```bash
-# Flask
-flask run
-
-# Node.js
-node app.js
-# atau: nodemon app.js
-
-# FastAPI
-uvicorn main:app --reload
-# --reload: auto-restart saat file berubah (seperti nodemon)
+cp .env.example .env
+# Edit .env sesuai kebutuhan
 ```
 
----
+## 🚀 Menjalankan Aplikasi
 
-### **Tahap 4: Testing API**
-
-#### 1. **Gunakan Interactive Docs (GRATIS!)**
-
-Buka browser:
-- **Swagger UI**: http://127.0.0.1:8000/docs
-- **ReDoc**: http://127.0.0.1:8000/redoc
-
-Ini otomatis di-generate! Tidak perlu setup Swagger manual seperti di Flask/Express.
-
-#### 2. **Gunakan cURL:**
-
+### Development Mode
 ```bash
-# GET request
-curl http://127.0.0.1:8000/api/halo/
+source venv/bin/activate
+uvicorn main:app --reload --port 8000
+```
 
-# POST request
-curl -X POST http://127.0.0.1:8000/api/halo/ \
+### Production Mode
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Aplikasi akan berjalan di: **http://localhost:8000**
+
+## 📚 API Documentation
+
+Setelah aplikasi berjalan, akses dokumentasi interaktif:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### API Endpoints
+
+#### Authentication
+```
+POST   /api/v1/auth/login      # Login (get JWT token)
+POST   /api/v1/auth/logout     # Logout
+GET    /api/v1/auth/dashboard  # Protected dashboard
+```
+
+#### Users (Requires Auth)
+```
+GET    /api/v1/users/          # Get all users
+GET    /api/v1/users/{id}      # Get user by ID
+POST   /api/v1/users/          # Create user
+PUT    /api/v1/users/{id}      # Update user
+DELETE /api/v1/users/{id}      # Delete user (Admin only)
+```
+
+#### Admin (Admin Only)
+```
+PATCH  /api/v1/admin/{id}/role # Update user role
+```
+
+## 🧪 Testing
+
+### Manual Testing
+```bash
+# Pastikan server berjalan
+python test_clean_architecture.py
+```
+
+### Menggunakan curl
+
+1. **Create admin user** (first time):
+```bash
+curl -X POST http://localhost:8000/api/v1/users/ \
   -H "Content-Type: application/json" \
-  -d '{"nama": "Edy", "handphone": "08111111"}'
+  -d '{
+    "nama": "Admin User",
+    "email": "admin@test.com",
+    "password": "admin123",
+    "role": "admin"
+  }'
 ```
 
-#### 3. **Gunakan Python requests:**
-
-```python
-import requests
-
-# GET
-response = requests.get("http://127.0.0.1:8000/api/halo/")
-print(response.json())
-
-# POST
-data = {"nama": "Edy", "handphone": "08111111"}
-response = requests.post("http://127.0.0.1:8000/api/halo/", json=data)
-print(response.json())
+2. **Login untuk mendapatkan token**:
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@test.com",
+    "password": "admin123"
+  }'
 ```
 
----
+3. **Akses protected endpoint**:
+```bash
+curl http://localhost:8000/api/v1/auth/dashboard \
+  -H "Authorization: Bearer <YOUR_TOKEN>"
+```
 
-### **Tahap 5: Konsep Lanjutan (Next Steps)**
+## 🐳 Docker
 
-Setelah menguasai dasar, lanjutkan dengan:
+### Build dan Run dengan Docker
+```bash
+# Build image
+docker build -t fastapi-clean .
 
-1. **Path Parameters & Query Parameters**
-   ```python
-   @app.get("/users/{user_id}")
-   async def get_user(user_id: int, skip: int = 0):
-       pass
-   ```
+# Run container
+docker run -p 8000:8000 fastapi-clean
+```
 
-2. **Database Integration** (SQLAlchemy/Tortoise ORM)
-   ```python
-   from sqlalchemy import create_engine
-   # Mirip dengan Sequelize di Node.js
-   ```
+### Menggunakan Docker Compose
+```bash
+# Start services
+docker-compose up -d
 
-3. **Authentication (JWT)**
-   ```python
-   from fastapi.security import OAuth2PasswordBearer
-   ```
+# Stop services
+docker-compose down
 
-4. **Dependency Injection**
-   ```python
-   # Konsep unik FastAPI - sangat powerful!
-   @app.get("/items/")
-   async def read_items(commons: dict = Depends(common_parameters)):
-       pass
-   ```
+# View logs
+docker-compose logs -f
+```
 
-5. **Background Tasks**
-   ```python
-   from fastapi import BackgroundTasks
-   # Untuk email, logging, etc
-   ```
+## 🔐 Environment Variables
 
-6. **WebSockets**
-   ```python
-   @app.websocket("/ws")
-   async def websocket_endpoint(websocket: WebSocket):
-       pass
-   ```
+File `.env.example` sudah disediakan. Copy dan sesuaikan:
 
----
+```env
+# Database
+DATABASE_URL=sqlite:///./app/siswa.db
 
-## 🚀 Quick Start
+# JWT Settings  
+SECRET_KEY=your-secret-key-min-32-characters
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# CORS
+CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
+
+# App Settings
+PROJECT_NAME=FastAPI JWT RBAC
+VERSION=1.0.0
+API_V1_PREFIX=/api/v1
+```
+
+## 🏗️ Clean Architecture Layers
+
+1. **API Layer** (`app/api/`) - HTTP requests & responses
+2. **Services Layer** (`app/services/`) - Business logic
+3. **Models Layer** (`app/models/`) - Database models
+4. **Schemas Layer** (`app/schemas/`) - Validation
+5. **Core Layer** (`app/core/`) - Configuration & utilities
+6. **Database Layer** (`app/db/`) - Database connection
+
+Lihat [CLEAN_ARCHITECTURE.md](CLEAN_ARCHITECTURE.md) untuk penjelasan lengkap.
+
+## 📝 Dokumentasi Tambahan
+
+- [CLEAN_ARCHITECTURE.md](CLEAN_ARCHITECTURE.md) - Penjelasan arsitektur lengkap
+- [AUTH_QUICKREF.md](AUTH_QUICKREF.md) - Quick reference JWT auth
+- [AUTHORIZATION_GUIDE.md](AUTHORIZATION_GUIDE.md) - RBAC implementation guide
+
+## 🎯 Quick Start
 
 ```bash
-# Install dependencies
+# 1. Setup
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Run server
+# 2. Run
 uvicorn main:app --reload
 
-# Run tests
-pytest test_main.py -v
+# 3. Access docs
+# Open http://localhost:8000/docs
 
-# Run tests with coverage
-pytest test_main.py -v --cov=main --cov-report=term-missing
-
-# Open browser
-# Docs: http://127.0.0.1:8000/docs
-# API: http://127.0.0.1:8000/api/halo/
+# 4. Create admin (via Swagger UI or curl)
+# 5. Login and get token
+# 6. Use token untuk akses protected endpoints
 ```
+
+## 👨‍💻 Development
+
+Lihat dokumentasi lengkap di [CLEAN_ARCHITECTURE.md](CLEAN_ARCHITECTURE.md) untuk:
+- Menambah endpoint baru
+- Menambah model baru
+- Menambah middleware
+- Best practices
+- Testing guidelines
 
 ---
 
-## 📖 Resources
-
-- **Official Docs**: https://fastapi.tiangolo.com/
-- **Tutorial**: https://fastapi.tiangolo.com/tutorial/
-- **GitHub**: https://github.com/tiangolo/fastapi
-
----
-
-## 💡 Tips untuk Developer Flask/Node.js
-
-1. **Async is Optional**: Bisa pakai `def` biasa kalau tidak perlu async
-   ```python
-   @app.get("/sync")
-   def sync_endpoint():  # Tanpa async, tetap jalan
-       return {"message": "OK"}
-   ```
-
-2. **Type Hints is Key**: Manfaatkan type hints untuk validasi otomatis
-
-3. **Pydantic = Joi + Class Validator**: Satu library untuk semua validasi
-
-4. **Dependency Injection**: Konsep baru yang sangat berguna untuk reusable code
-
-5. **Auto Docs**: Jangan lupa dokumentasikan dengan docstring, otomatis masuk ke Swagger!
-
----
-
-## 🎓 Learning Path
-
-```
-Week 1a: Router Basic siswa, halo
-@app.get("/api/halo/")
-async def halo():
-    return {"succes : true , message": "Get from Halo API", data : []}
-@app.get("/api/siswa/")
-async def siswa():
-    return {"succes : true , message": "Get from siswa API", data : [{no : 1, nama : edy, email : edycoleee@gmail.com}]}
-Week 1b: CRUD siswa sqlite SQL
-Week 2a: CRUD siswa sqlite Database Integration (SQLAlchemy)
-Week 2b: Middleware, Logger
-Week 3a: JWT Authentication 
-Week 3b: /dashboard /siswa >> admin,user Authorization
-Week 4: Advanced Features (WebSocket, Background Tasks)
-Week 5: Testing & Deployment docker 
-```
-
-Selamat belajar! 🚀
+Made with ❤️ using FastAPI & Clean Architecture

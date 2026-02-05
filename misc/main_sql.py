@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from typing import List
 import sqlite3
 
-from models import SiswaCreate, SiswaUpdate, SiswaResponse
-from database import (
+from misc.models import SiswaCreate, SiswaUpdate, SiswaResponse
+from misc.database import (
     init_db,
     get_all_siswa,
     get_siswa_by_id,
