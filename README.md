@@ -243,11 +243,14 @@ uvicorn main:app --reload
 ## 🎓 Learning Path
 
 ```
-Week 1: Basic CRUD ← Anda di sini
-Week 2: Database Integration (SQLAlchemy)
-Week 3: Authentication & Authorization
+Week 1: Router Basic siswa, halo
+Week 1: CRUD siswa sqlite SQL
+Week 2: CRUD siswa sqlite Database Integration (SQLAlchemy)
+Week 2: Middleware, Logger
+Week 3: JWT Authentication 
+Week 3: /dashboard /siswa >> admin,user Authorization
 Week 4: Advanced Features (WebSocket, Background Tasks)
-Week 5: Testing & Deployment
+Week 5: Testing & Deployment docker 
 ```
 
 Selamat belajar! 🚀
