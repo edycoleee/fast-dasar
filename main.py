@@ -30,7 +30,33 @@ async def halo_get():
     - Flask: @app.route('/api/halo/', methods=['GET'])
     - Express: app.get('/api/halo/', ...)
     """
-    return {"message": "Halo! Welcome to FastAPI"}
+    return {
+        "success": True, 
+        "message": "Get from Halo API", 
+        "data": []
+    }
+
+
+# Endpoint 3: GET /api/siswa/
+@app.get("/api/siswa/")
+async def siswa_get():
+    """
+    Endpoint GET yang mengembalikan data siswa.
+    
+    Untuk tahap belajar ini, data masih hardcoded.
+    Nanti akan diganti dengan database (Week 1b - SQLite).
+    """
+    return {
+        "success": True, 
+        "message": "Get from siswa API", 
+        "data": [
+            {
+                "no": 1, 
+                "nama": "Edy", 
+                "email": "edycoleee@gmail.com"
+            }
+        ]
+    }
 
 
 # Endpoint 2: POST /api/halo/

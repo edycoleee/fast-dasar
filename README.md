@@ -206,6 +206,12 @@ pip install -r requirements.txt
 # Run server
 uvicorn main:app --reload
 
+# Run tests
+pytest test_main.py -v
+
+# Run tests with coverage
+pytest test_main.py -v --cov=main --cov-report=term-missing
+
 # Open browser
 # Docs: http://127.0.0.1:8000/docs
 # API: http://127.0.0.1:8000/api/halo/
@@ -243,12 +249,18 @@ uvicorn main:app --reload
 ## 🎓 Learning Path
 
 ```
-Week 1: Router Basic siswa, halo
-Week 1: CRUD siswa sqlite SQL
-Week 2: CRUD siswa sqlite Database Integration (SQLAlchemy)
-Week 2: Middleware, Logger
-Week 3: JWT Authentication 
-Week 3: /dashboard /siswa >> admin,user Authorization
+Week 1a: Router Basic siswa, halo
+@app.get("/api/halo/")
+async def halo():
+    return {"succes : true , message": "Get from Halo API", data : []}
+@app.get("/api/siswa/")
+async def siswa():
+    return {"succes : true , message": "Get from siswa API", data : [{no : 1, nama : edy, email : edycoleee@gmail.com}]}
+Week 1b: CRUD siswa sqlite SQL
+Week 2a: CRUD siswa sqlite Database Integration (SQLAlchemy)
+Week 2b: Middleware, Logger
+Week 3a: JWT Authentication 
+Week 3b: /dashboard /siswa >> admin,user Authorization
 Week 4: Advanced Features (WebSocket, Background Tasks)
 Week 5: Testing & Deployment docker 
 ```
