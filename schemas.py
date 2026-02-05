@@ -3,8 +3,8 @@ Pydantic Schemas untuk Request/Response
 Terpisah dari SQLAlchemy models untuk separation of concerns
 """
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from typing import Optional, Literal
 
 
 class SiswaBase(BaseModel):
@@ -19,6 +19,7 @@ class SiswaCreate(SiswaBase):
     Inherit dari SiswaBase
     """
     password: str = Field(..., min_length=6, description="Password siswa (min 6 karakter)")
+    role: Literal["admin", "user"] = Field(default="user", description="Role: admin atau user")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -26,7 +27,8 @@ class SiswaCreate(SiswaBase):
                 {
                     "nama": "Edy Cole",
                     "email": "edycoleee@gmail.com",
-                    "password": "secret123"
+                    "password": "secret123",
+                    "role": "user"
                 }
             ]
         }
@@ -56,12 +58,13 @@ class SiswaUpdate(SiswaBase):
 class SiswaResponse(SiswaBase):
     """
     Schema untuk response siswa
-    Include id dari database
+    Include id dan role dari database
     
     model_config with from_attributes=True memungkinkan Pydantic
     membaca data dari SQLAlchemy model (bukan hanya dict)
     """
     id: int
+    role: str
     
     model_config = ConfigDict(
         from_attributes=True,  # Dulu namanya orm_mode = True di Pydantic v1
@@ -70,7 +73,8 @@ class SiswaResponse(SiswaBase):
                 {
                     "id": 1,
                     "nama": "Edy Cole",
-                    "email": "edycoleee@gmail.com"
+                    "email": "edycoleee@gmail.com",
+                    "role": "user"
                 }
             ]
         }
@@ -113,9 +117,30 @@ class LoginResponse(BaseModel):
                     "user": {
                         "id": 1,
                         "nama": "Edy Cole",
-                        "email": "edycoleee@gmail.com"
+                        "email": "edycoleee@gmail.com",
+                        "role": "user"
                     }
                 }
+            ]
+        }
+    )
+
+
+# ==================== AUTHORIZATION SCHEMAS ====================
+
+class UpdateRoleRequest(BaseModel):
+    """Schema untuk update role user (hanya admin)"""
+    role: Literal["admin", "user"] = Field(..., description="Role baru: admin atau user")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "role": "admin"
+                }
+            ]
+        }
+    )
             ]
         }
     )

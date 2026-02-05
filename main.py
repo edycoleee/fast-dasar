@@ -12,10 +12,13 @@ from typing import List
 from datetime import datetime
 
 from db_sqlalchemy import Siswa, get_db, init_db
-from schemas import SiswaCreate, SiswaUpdate, SiswaResponse, LoginRequest, LoginResponse
+from schemas import SiswaCreate, SiswaUpdate, SiswaResponse, LoginRequest, LoginResponse, UpdateRoleRequest
 
 # Import authentication utilities
 from auth_utils import hash_password, verify_password, create_access_token, decode_access_token, extract_bearer_token
+
+# Import authorization utilities
+from authorization import require_admin, require_role, get_current_user, Role
 
 # Import middleware
 from middleware import (
@@ -80,21 +83,33 @@ async def shutdown_event():
 # ==================== CRUD ENDPOINTS ====================
 
 @app.post("/api/siswa/", response_model=SiswaResponse, status_code=status.HTTP_201_CREATED)
-async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
+async def create_siswa(siswa: SiswaCreate, request: Request, db: Session = Depends(get_db)):
     """
     CREATE - Tambah siswa baru dengan password yang di-hash
+    
+    Permission:
+    - Admin: bisa set role (admin/user)
+    - User: hanya bisa buat user baru dengan role=user
     
     SQLAlchemy ORM:
     1. Buat instance dari model Siswa
     2. Hash password dengan bcrypt
-    3. Add ke session
-    4. Commit untuk save ke database
-    5. Refresh untuk mendapatkan data yang ter-generate (id)
+    3. Set role (default: user)
+    4. Add ke session
+    5. Commit untuk save ke database
+    6. Refresh untuk mendapatkan data yang ter-generate (id)
     
     Equivalent SQL:
-    INSERT INTO siswa (nama, email, password) VALUES (?, ?, ?)
+    INSERT INTO siswa (nama, email, password, role) VALUES (?, ?, ?, ?)
     """
     try:
+        # Check permission untuk set role
+        current_user = get_current_user(request)
+        
+        # Jika bukan admin, force role = user
+        if current_user.get("role") != Role.ADMIN:
+            siswa.role = "user"
+        
         # 1. Hash password sebelum disimpan
         hashed_password = hash_password(siswa.password)
         
@@ -102,7 +117,8 @@ async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
         db_siswa = Siswa(
             nama=siswa.nama,
             email=siswa.email,
-            password=hashed_password
+            password=hashed_password,
+            role=siswa.role
         )
         
         # 3. Add ke database session
@@ -236,18 +252,26 @@ async def update_siswa(
 
 
 @app.delete("/api/siswa/{siswa_id}")
-async def delete_siswa(siswa_id: int, db: Session = Depends(get_db)):
+async def delete_siswa(siswa_id: int, request: Request, db: Session = Depends(get_db)):
     """
-    DELETE - Hapus siswa
+    DELETE - Hapus siswa (HANYA ADMIN)
+    
+    Permission:
+    - Admin: bisa delete semua siswa
+    - User: TIDAK BISA delete (403 Forbidden)
     
     SQLAlchemy ORM:
-    1. Query siswa by ID
-    2. Delete object
-    3. Commit changes
+    1. Check permission (admin only)
+    2. Query siswa by ID
+    3. Delete object
+    4. Commit changes
     
     Equivalent SQL:
     DELETE FROM siswa WHERE id = ?
     """
+    # Check admin permission
+    require_admin(request)
+    
     try:
         # 1. Cari siswa
         siswa = db.query(Siswa).filter(Siswa.id == siswa_id).first()
@@ -416,7 +440,8 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         user={
             "id": siswa.id,
             "nama": siswa.nama,
-            "email": siswa.email
+            "email": siswa.email,
+            "role": siswa.role
         }
     )
 
@@ -477,6 +502,84 @@ async def logout():
         "message": "Logout successful",
         "instruction": "Please delete the JWT token from client storage"
     }
+
+
+# ==================== AUTHORIZATION ENDPOINTS ====================
+# Admin endpoints untuk manage user roles
+
+@app.put("/api/users/{user_id}/role", response_model=SiswaResponse, tags=["Authorization"])
+async def update_user_role(
+    user_id: int,
+    role_update: UpdateRoleRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    UPDATE USER ROLE - Ubah role user (HANYA ADMIN)
+    
+    Permission:
+    - Admin: bisa ubah role siapa saja (admin/user)
+    - User: TIDAK BISA (403 Forbidden)
+    
+    Cara test:
+    ```bash
+    # Login sebagai admin
+    TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"admin@example.com","password":"admin123"}' \
+      | jq -r '.access_token')
+    
+    # Update role user jadi admin
+    curl -X PUT http://localhost:8000/api/users/2/role \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"role":"admin"}'
+    ```
+    """
+    # Check admin permission
+    require_admin(request)
+    
+    try:
+        # Find user
+        user = db.query(Siswa).filter(Siswa.id == user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User dengan ID {user_id} tidak ditemukan"
+            )
+        
+        # Update role
+        user.role = role_update.role
+        
+        # Commit changes
+        db.commit()
+        db.refresh(user)
+        
+        return user
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
+
+
+@app.get("/api/users", response_model=List[SiswaResponse], tags=["Authorization"])
+async def get_all_users(request: Request, db: Session = Depends(get_db)):
+    """
+    GET ALL USERS - Lihat semua user dengan role (HANYA ADMIN)
+    
+    Permission:
+    - Admin: bisa lihat semua user
+    - User: TIDAK BISA (403 Forbidden)
+    """
+    # Check admin permission
+    require_admin(request)
+    
+    users = db.query(Siswa).all()
+    return users
 
 
 # ==================== JWT AUTHENTICATION MIDDLEWARE ====================
@@ -586,6 +689,7 @@ async def jwt_auth_middleware(request: Request, call_next):
                 "id": siswa.id,
                 "nama": siswa.nama,
                 "email": siswa.email,
+                "role": siswa.role,
                 "authenticated_at": datetime.utcnow().isoformat()
             }
         finally:

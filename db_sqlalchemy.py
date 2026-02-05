@@ -36,7 +36,8 @@ class Siswa(Base):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nama VARCHAR(100) NOT NULL,
         email VARCHAR(100) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'user'
     )
     """
     __tablename__ = "siswa"
@@ -45,9 +46,10 @@ class Siswa(Base):
     nama = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False, index=True)
     password = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, default="user")  # "admin" or "user"
     
     def __repr__(self):
-        return f"<Siswa(id={self.id}, nama='{self.nama}', email='{self.email}')>"
+        return f"<Siswa(id={self.id}, nama='{self.nama}', email='{self.email}', role='{self.role}')>"
 
 
 # ==================== DATABASE FUNCTIONS ====================
