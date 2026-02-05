@@ -16,6 +16,8 @@ __pycache__/
 *.db-journal
 *.sqlite
 *.sqlite3
+siswa.db
+siswa_orm.db
 
 # Testing
 .pytest_cache/

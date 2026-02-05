@@ -1,37 +1,32 @@
 """
-FastAPI Application dengan CRUD SQLite
-Week 1b: CRUD siswa dengan SQLite menggunakan raw SQL
+FastAPI Application dengan SQLAlchemy ORM
+Week 2a: CRUD siswa dengan SQLAlchemy
 """
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List
-import sqlite3
 
-from models import SiswaCreate, SiswaUpdate, SiswaResponse
-from database import (
-    init_db,
-    get_all_siswa,
-    get_siswa_by_id,
-    insert_siswa,
-    update_siswa,
-    delete_siswa,
-    count_siswa
-)
+from db_sqlalchemy import Siswa, get_db, init_db
+from schemas import SiswaCreate, SiswaUpdate, SiswaResponse
 
 # Inisialisasi FastAPI app
 app = FastAPI(
-    title="Siswa CRUD API",
-    description="API CRUD untuk manajemen data siswa dengan SQLite",
-    version="2.0.0"
+    title="Siswa CRUD API - SQLAlchemy",
+    description="API CRUD untuk manajemen data siswa dengan SQLAlchemy ORM",
+    version="2.1.0"
 )
 
-# Initialize database saat startup
+
+# ==================== STARTUP & SHUTDOWN ====================
+
 @app.on_event("startup")
 async def startup_event():
     """Inisialisasi database saat aplikasi start"""
     init_db()
-    print("🚀 FastAPI app started with SQLite database")
+    print("🚀 FastAPI app started with SQLAlchemy ORM")
 
 
 @app.on_event("shutdown")
@@ -42,78 +37,117 @@ async def shutdown_event():
 
 # ==================== CRUD ENDPOINTS ====================
 
-@app.post("/api/siswa/", status_code=status.HTTP_201_CREATED)
-async def create_siswa(siswa: SiswaCreate):
+@app.post("/api/siswa/", response_model=SiswaResponse, status_code=status.HTTP_201_CREATED)
+async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
     """
     CREATE - Tambah siswa baru
     
-    Body:
-    - nama: string (required, min 1 char)
-    - email: string (required, valid email, unique)
+    SQLAlchemy ORM:
+    1. Buat instance dari model Siswa
+    2. Add ke session
+    3. Commit untuk save ke database
+    4. Refresh untuk mendapatkan data yang ter-generate (id)
     
-    Returns:
-    - 201: Siswa berhasil dibuat
-    - 400: Email sudah digunakan
+    Equivalent SQL:
+    INSERT INTO siswa (nama, email) VALUES (?, ?)
     """
     try:
-        siswa_id = insert_siswa(siswa.nama, siswa.email)
-        new_siswa = get_siswa_by_id(siswa_id)
+        # 1. Buat instance SQLAlchemy model
+        db_siswa = Siswa(
+            nama=siswa.nama,
+            email=siswa.email
+        )
         
-        return {
-            "success": True,
-            "message": "Siswa berhasil ditambahkan",
-            "data": new_siswa
-        }
-    except sqlite3.IntegrityError:
+        # 2. Add ke database session
+        db.add(db_siswa)
+        
+        # 3. Commit transaction
+        db.commit()
+        
+        # 4. Refresh untuk mendapatkan data dari DB (seperti id yang auto-generated)
+        db.refresh(db_siswa)
+        
+        return db_siswa
+        
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Email {siswa.email} sudah digunakan"
         )
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error: {str(e)}"
         )
 
 
-@app.get("/api/siswa/")
-async def read_all_siswa():
+@app.get("/api/siswa/", response_model=List[SiswaResponse])
+async def read_all_siswa(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
     """
-    READ ALL - Ambil semua data siswa
+    READ ALL - Ambil semua data siswa dengan pagination
     
-    Returns:
-    - 200: List siswa (bisa kosong)
+    Query Parameters:
+    - skip: Berapa data yang di-skip (default 0)
+    - limit: Maximum berapa data yang diambil (default 100)
+    
+    SQLAlchemy ORM:
+    db.query(Siswa).offset(skip).limit(limit).all()
+    
+    Equivalent SQL:
+    SELECT * FROM siswa LIMIT ? OFFSET ?
     """
-    try:
-        siswa_list = get_all_siswa()
-        total = len(siswa_list)
-        
-        return {
-            "success": True,
-            "message": f"Berhasil mengambil {total} data siswa",
-            "data": siswa_list
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error: {str(e)}"
-        )
+    siswa_list = db.query(Siswa).offset(skip).limit(limit).all()
+    return siswa_list
 
 
-@app.get("/api/siswa/{siswa_id}")
-async def read_siswa(siswa_id: int):
+@app.get("/api/siswa/{siswa_id}", response_model=SiswaResponse)
+async def read_siswa(siswa_id: int, db: Session = Depends(get_db)):
     """
     READ ONE - Ambil data siswa berdasarkan ID
     
-    Path Parameter:
-    - siswa_id: integer (ID siswa)
+    SQLAlchemy ORM:
+    db.query(Siswa).filter(Siswa.id == siswa_id).first()
     
-    Returns:
-    - 200: Data siswa ditemukan
-    - 404: Siswa tidak ditemukan
+    Equivalent SQL:
+    SELECT * FROM siswa WHERE id = ? LIMIT 1
+    """
+    siswa = db.query(Siswa).filter(Siswa.id == siswa_id).first()
+    
+    if siswa is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
+        )
+    
+    return siswa
+
+
+@app.put("/api/siswa/{siswa_id}", response_model=SiswaResponse)
+async def update_siswa(
+    siswa_id: int,
+    siswa_update: SiswaUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    UPDATE - Update data siswa
+    
+    SQLAlchemy ORM:
+    1. Query siswa by ID
+    2. Update attribute
+    3. Commit changes
+    
+    Equivalent SQL:
+    UPDATE siswa SET nama = ?, email = ? WHERE id = ?
     """
     try:
-        siswa = get_siswa_by_id(siswa_id)
+        # 1. Cari siswa
+        siswa = db.query(Siswa).filter(Siswa.id == siswa_id).first()
         
         if siswa is None:
             raise HTTPException(
@@ -121,71 +155,28 @@ async def read_siswa(siswa_id: int):
                 detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
             )
         
-        return {
-            "success": True,
-            "message": "Siswa ditemukan",
-            "data": siswa
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error: {str(e)}"
-        )
-
-
-@app.put("/api/siswa/{siswa_id}")
-async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate):
-    """
-    UPDATE - Update data siswa
-    
-    Path Parameter:
-    - siswa_id: integer (ID siswa)
-    
-    Body:
-    - nama: string (required)
-    - email: string (required, valid email, unique)
-    
-    Returns:
-    - 200: Siswa berhasil diupdate
-    - 404: Siswa tidak ditemukan
-    - 400: Email sudah digunakan siswa lain
-    """
-    try:
-        # Cek apakah siswa exists
-        existing_siswa = get_siswa_by_id(siswa_id)
-        if existing_siswa is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
-            )
+        # 2. Update attributes
+        siswa.nama = siswa_update.nama
+        siswa.email = siswa_update.email
         
-        # Update siswa
-        success = update_siswa(siswa_id, siswa.nama, siswa.email)
+        # 3. Commit changes
+        db.commit()
         
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Gagal mengupdate siswa"
-            )
+        # 4. Refresh untuk mendapatkan data terbaru
+        db.refresh(siswa)
         
-        # Get updated data
-        updated_siswa = get_siswa_by_id(siswa_id)
+        return siswa
         
-        return {
-            "success": True,
-            "message": "Siswa berhasil diupdate",
-            "data": updated_siswa
-        }
-    except HTTPException:
-        raise
-    except sqlite3.IntegrityError:
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Email {siswa.email} sudah digunakan"
+            detail=f"Email {siswa_update.email} sudah digunakan"
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error: {str(e)}"
@@ -193,43 +184,42 @@ async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate):
 
 
 @app.delete("/api/siswa/{siswa_id}")
-async def delete_siswa_data(siswa_id: int):
+async def delete_siswa(siswa_id: int, db: Session = Depends(get_db)):
     """
     DELETE - Hapus siswa
     
-    Path Parameter:
-    - siswa_id: integer (ID siswa)
+    SQLAlchemy ORM:
+    1. Query siswa by ID
+    2. Delete object
+    3. Commit changes
     
-    Returns:
-    - 200: Siswa berhasil dihapus
-    - 404: Siswa tidak ditemukan
+    Equivalent SQL:
+    DELETE FROM siswa WHERE id = ?
     """
     try:
-        # Cek apakah siswa exists
-        existing_siswa = get_siswa_by_id(siswa_id)
-        if existing_siswa is None:
+        # 1. Cari siswa
+        siswa = db.query(Siswa).filter(Siswa.id == siswa_id).first()
+        
+        if siswa is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
             )
         
-        # Delete siswa
-        success = delete_siswa(siswa_id)
+        # 2. Delete object
+        db.delete(siswa)
         
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Gagal menghapus siswa"
-            )
+        # 3. Commit changes
+        db.commit()
         
         return {
             "success": True,
             "message": f"Siswa dengan ID {siswa_id} berhasil dihapus",
             "data": None
         }
-    except HTTPException:
-        raise
+        
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error: {str(e)}"
@@ -239,19 +229,20 @@ async def delete_siswa_data(siswa_id: int):
 # ==================== INFO ENDPOINTS ====================
 
 @app.get("/")
-async def root():
+async def root(db: Session = Depends(get_db)):
     """Root endpoint dengan informasi API"""
-    total_siswa = count_siswa()
+    total_siswa = db.query(Siswa).count()
     
     return {
-        "message": "Siswa CRUD API is running!",
-        "version": "2.0.0",
+        "message": "Siswa CRUD API with SQLAlchemy is running!",
+        "version": "2.1.0",
+        "orm": "SQLAlchemy",
         "total_siswa": total_siswa,
         "endpoints": {
             "docs": "/docs",
             "redoc": "/redoc",
             "create": "POST /api/siswa/",
-            "read_all": "GET /api/siswa/",
+            "read_all": "GET /api/siswa/?skip=0&limit=100",
             "read_one": "GET /api/siswa/{id}",
             "update": "PUT /api/siswa/{id}",
             "delete": "DELETE /api/siswa/{id}"
@@ -260,13 +251,16 @@ async def root():
 
 
 @app.get("/api/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint"""
     try:
-        total_siswa = count_siswa()
+        # Test database connection
+        total_siswa = db.query(Siswa).count()
+        
         return {
             "status": "healthy",
             "database": "connected",
+            "orm": "SQLAlchemy",
             "total_siswa": total_siswa
         }
     except Exception as e:
@@ -278,3 +272,37 @@ async def health_check():
                 "error": str(e)
             }
         )
+
+
+# ==================== ADVANCED QUERIES ====================
+
+@app.get("/api/siswa/search/", response_model=List[SiswaResponse])
+async def search_siswa(
+    q: str,
+    db: Session = Depends(get_db)
+):
+    """
+    SEARCH - Cari siswa berdasarkan nama atau email
+    
+    Query Parameter:
+    - q: Search query
+    
+    SQLAlchemy ORM dengan filter OR:
+    db.query(Siswa).filter(or_(
+        Siswa.nama.contains(q),
+        Siswa.email.contains(q)
+    ))
+    
+    Equivalent SQL:
+    SELECT * FROM siswa WHERE nama LIKE '%?%' OR email LIKE '%?%'
+    """
+    from sqlalchemy import or_
+    
+    siswa_list = db.query(Siswa).filter(
+        or_(
+            Siswa.nama.contains(q),
+            Siswa.email.contains(q)
+        )
+    ).all()
+    
+    return siswa_list
