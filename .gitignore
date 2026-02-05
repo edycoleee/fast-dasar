@@ -11,6 +11,12 @@ __pycache__/
 *.so
 .Python
 
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Testing
 .pytest_cache/
 .coverage
