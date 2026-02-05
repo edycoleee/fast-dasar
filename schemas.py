@@ -69,3 +69,41 @@ class SiswaResponse(SiswaBase):
             ]
         }
     )
+
+
+# ==================== AUTH SCHEMAS ====================
+
+class LoginRequest(BaseModel):
+    """Schema untuk login request"""
+    username: str = Field(..., min_length=1, description="Username untuk login")
+    password: str = Field(..., min_length=1, description="Password untuk login")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "username": "admin",
+                    "password": "admin"
+                }
+            ]
+        }
+    )
+
+
+class LoginResponse(BaseModel):
+    """Schema untuk login response"""
+    message: str
+    token: str
+    username: str
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "message": "Login successful",
+                    "token": "123456",
+                    "username": "admin"
+                }
+            ]
+        }
+    )

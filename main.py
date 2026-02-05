@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from typing import List
 
 from db_sqlalchemy import Siswa, get_db, init_db
-from schemas import SiswaCreate, SiswaUpdate, SiswaResponse
+from schemas import SiswaCreate, SiswaUpdate, SiswaResponse, LoginRequest, LoginResponse
 
 # Import middleware
 from middleware import (
@@ -344,3 +344,150 @@ async def search_siswa(
     ).all()
     
     return siswa_list
+
+
+# ==================== AUTHENTICATION ENDPOINTS ====================
+# Simulasi sederhana untuk belajar middleware sebelum JWT
+
+@app.post("/api/auth/login", response_model=LoginResponse, tags=["Authentication"])
+async def login(credentials: LoginRequest):
+    """
+    LOGIN - Endpoint untuk login dengan username dan password
+    
+    Credential yang valid:
+    - username: admin
+    - password: admin
+    
+    Response:
+    - token: "123456" (token sederhana untuk simulasi, nanti akan diganti JWT)
+    
+    Cara test:
+    ```bash
+    curl -X POST http://localhost:8000/api/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"username":"admin","password":"admin"}'
+    ```
+    """
+    # Validasi credentials (hardcoded untuk pembelajaran)
+    if credentials.username == "admin" and credentials.password == "admin":
+        return LoginResponse(
+            message="Login successful",
+            token="123456",
+            username=credentials.username
+        )
+    
+    # Jika credentials salah
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid username or password",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+@app.get("/api/landing", tags=["Authentication"])
+async def landing_page(request: Request):
+    """
+    LANDING PAGE - Endpoint yang di-protect dengan Bearer token
+    
+    Harus include header:
+    Authorization: Bearer 123456
+    
+    Cara test:
+    ```bash
+    # Tanpa token (akan error 401)
+    curl http://localhost:8000/api/landing
+    
+    # Dengan token (success)
+    curl -H "Authorization: Bearer 123456" http://localhost:8000/api/landing
+    ```
+    
+    Endpoint ini menggunakan middleware authentication.
+    Lihat middleware di bawah yang check Authorization header.
+    """
+    # Data user dari middleware (di-set di request.state)
+    user_data = getattr(request.state, "user", None)
+    
+    return {
+        "message": "Welcome to the landing page!",
+        "description": "This is a protected endpoint - you need Bearer token to access",
+        "user": user_data,
+        "info": "Token ini sederhana, nanti akan diganti dengan JWT yang lebih secure"
+    }
+
+
+# ==================== AUTHENTICATION MIDDLEWARE ====================
+# Middleware untuk check Bearer token pada endpoint tertentu
+
+@app.middleware("http")
+async def simple_auth_middleware(request: Request, call_next):
+    """
+    Simple Authentication Middleware
+    
+    Cara kerja:
+    1. Check jika endpoint perlu authentication (hanya /api/landing)
+    2. Check Authorization header
+    3. Validasi Bearer token = "123456"
+    4. Jika valid, simpan user info di request.state
+    5. Jika tidak, return 401 Unauthorized
+    
+    Ini adalah simulasi sederhana untuk belajar middleware.
+    Nanti akan diganti dengan JWT authentication yang lebih secure.
+    
+    Mirip dengan Express.js:
+    ```javascript
+    app.use((req, res, next) => {
+        if (req.path === '/api/landing') {
+            const token = req.headers.authorization;
+            if (token !== 'Bearer 123456') {
+                return res.status(401).json({error: 'Unauthorized'});
+            }
+            req.user = {username: 'admin'};
+        }
+        next();
+    });
+    ```
+    """
+    # Daftar endpoint yang perlu authentication
+    protected_paths = ["/api/landing"]
+    
+    # Check apakah endpoint perlu auth
+    if request.url.path in protected_paths:
+        # Ambil Authorization header
+        auth_header = request.headers.get("Authorization")
+        
+        # Check format: "Bearer 123456"
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "detail": "Missing or invalid Authorization header",
+                    "hint": "Use: Authorization: Bearer 123456"
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Extract token
+        token = auth_header.replace("Bearer ", "")
+        
+        # Validasi token (hardcoded untuk pembelajaran)
+        if token != "123456":
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "detail": "Invalid token",
+                    "hint": "Valid token is: 123456"
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Token valid! Simpan user info di request.state
+        # Ini bisa diakses di endpoint handler
+        request.state.user = {
+            "username": "admin",
+            "role": "administrator",
+            "authenticated_at": "2026-02-05"
+        }
+    
+    # Lanjutkan ke endpoint handler
+    response = await call_next(request)
+    return response
