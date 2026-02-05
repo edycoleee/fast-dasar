@@ -35,7 +35,8 @@ class Siswa(Base):
     CREATE TABLE siswa (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nama VARCHAR(100) NOT NULL,
-        email VARCHAR(100) NOT NULL UNIQUE
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL
     )
     """
     __tablename__ = "siswa"
@@ -43,6 +44,7 @@ class Siswa(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nama = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False, index=True)
+    password = Column(String(255), nullable=False)
     
     def __repr__(self):
         return f"<Siswa(id={self.id}, nama='{self.nama}', email='{self.email}')>"

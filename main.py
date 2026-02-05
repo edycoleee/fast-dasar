@@ -1,6 +1,6 @@
 """
-FastAPI Application dengan SQLAlchemy ORM
-Week 2a: CRUD siswa dengan SQLAlchemy
+FastAPI Application dengan SQLAlchemy ORM dan JWT Authentication
+Week 2b: JWT Authentication Implementation
 """
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request
@@ -9,9 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List
+from datetime import datetime
 
 from db_sqlalchemy import Siswa, get_db, init_db
 from schemas import SiswaCreate, SiswaUpdate, SiswaResponse, LoginRequest, LoginResponse
+
+# Import authentication utilities
+from auth_utils import hash_password, verify_password, create_access_token, decode_access_token, extract_bearer_token
 
 # Import middleware
 from middleware import (
@@ -78,31 +82,36 @@ async def shutdown_event():
 @app.post("/api/siswa/", response_model=SiswaResponse, status_code=status.HTTP_201_CREATED)
 async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
     """
-    CREATE - Tambah siswa baru
+    CREATE - Tambah siswa baru dengan password yang di-hash
     
     SQLAlchemy ORM:
     1. Buat instance dari model Siswa
-    2. Add ke session
-    3. Commit untuk save ke database
-    4. Refresh untuk mendapatkan data yang ter-generate (id)
+    2. Hash password dengan bcrypt
+    3. Add ke session
+    4. Commit untuk save ke database
+    5. Refresh untuk mendapatkan data yang ter-generate (id)
     
     Equivalent SQL:
-    INSERT INTO siswa (nama, email) VALUES (?, ?)
+    INSERT INTO siswa (nama, email, password) VALUES (?, ?, ?)
     """
     try:
-        # 1. Buat instance SQLAlchemy model
+        # 1. Hash password sebelum disimpan
+        hashed_password = hash_password(siswa.password)
+        
+        # 2. Buat instance SQLAlchemy model
         db_siswa = Siswa(
             nama=siswa.nama,
-            email=siswa.email
+            email=siswa.email,
+            password=hashed_password
         )
         
-        # 2. Add ke database session
+        # 3. Add ke database session
         db.add(db_siswa)
         
-        # 3. Commit transaction
+        # 4. Commit transaction
         db.commit()
         
-        # 4. Refresh untuk mendapatkan data dari DB (seperti id yang auto-generated)
+        # 5. Refresh untuk mendapatkan data dari DB (seperti id yang auto-generated)
         db.refresh(db_siswa)
         
         return db_siswa
@@ -173,15 +182,16 @@ async def update_siswa(
     db: Session = Depends(get_db)
 ):
     """
-    UPDATE - Update data siswa
+    UPDATE - Update data siswa (termasuk password jika ada)
     
     SQLAlchemy ORM:
     1. Query siswa by ID
     2. Update attribute
-    3. Commit changes
+    3. Hash password baru jika ada
+    4. Commit changes
     
     Equivalent SQL:
-    UPDATE siswa SET nama = ?, email = ? WHERE id = ?
+    UPDATE siswa SET nama = ?, email = ?, password = ? WHERE id = ?
     """
     try:
         # 1. Cari siswa
@@ -197,10 +207,14 @@ async def update_siswa(
         siswa.nama = siswa_update.nama
         siswa.email = siswa_update.email
         
-        # 3. Commit changes
+        # 3. Update password jika ada (hash dulu)
+        if siswa_update.password:
+            siswa.password = hash_password(siswa_update.password)
+        
+        # 4. Commit changes
         db.commit()
         
-        # 4. Refresh untuk mendapatkan data terbaru
+        # 5. Refresh untuk mendapatkan data terbaru
         db.refresh(siswa)
         
         return siswa
@@ -350,143 +364,232 @@ async def search_siswa(
 # Simulasi sederhana untuk belajar middleware sebelum JWT
 
 @app.post("/api/auth/login", response_model=LoginResponse, tags=["Authentication"])
-async def login(credentials: LoginRequest):
+async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
-    LOGIN - Endpoint untuk login dengan username dan password
+    LOGIN - Endpoint untuk login dengan email dan password
     
-    Credential yang valid:
-    - username: admin
-    - password: admin
-    
-    Response:
-    - token: "123456" (token sederhana untuk simulasi, nanti akan diganti JWT)
+    Flow:
+    1. Cari siswa berdasarkan email
+    2. Verifikasi password dengan hash
+    3. Generate JWT token
+    4. Return token dan user info
     
     Cara test:
     ```bash
+    # 1. Register siswa dulu
+    curl -X POST http://localhost:8000/api/siswa/ \
+      -H "Content-Type: application/json" \
+      -d '{"nama":"Edy Cole","email":"edycoleee@gmail.com","password":"secret123"}'
+    
+    # 2. Login
     curl -X POST http://localhost:8000/api/auth/login \
       -H "Content-Type: application/json" \
-      -d '{"username":"admin","password":"admin"}'
+      -d '{"email":"edycoleee@gmail.com","password":"secret123"}'
     ```
     """
-    # Validasi credentials (hardcoded untuk pembelajaran)
-    if credentials.username == "admin" and credentials.password == "admin":
-        return LoginResponse(
-            message="Login successful",
-            token="123456",
-            username=credentials.username
+    # 1. Cari siswa berdasarkan email
+    siswa = db.query(Siswa).filter(Siswa.email == credentials.email).first()
+    
+    if not siswa:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email atau password salah",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Jika credentials salah
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid username or password",
-        headers={"WWW-Authenticate": "Bearer"},
+    # 2. Verifikasi password
+    if not verify_password(credentials.password, siswa.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email atau password salah",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # 3. Generate JWT token
+    access_token = create_access_token(data={"sub": siswa.email})
+    
+    # 4. Return response
+    return LoginResponse(
+        message="Login successful",
+        access_token=access_token,
+        token_type="bearer",
+        user={
+            "id": siswa.id,
+            "nama": siswa.nama,
+            "email": siswa.email
+        }
     )
 
 
-@app.get("/api/landing", tags=["Authentication"])
-async def landing_page(request: Request):
+@app.get("/api/dashboard", tags=["Authentication"])
+async def dashboard(request: Request):
     """
-    LANDING PAGE - Endpoint yang di-protect dengan Bearer token
+    DASHBOARD - Protected endpoint dengan JWT authentication
     
     Harus include header:
-    Authorization: Bearer 123456
+    Authorization: Bearer <jwt_token>
     
     Cara test:
     ```bash
-    # Tanpa token (akan error 401)
-    curl http://localhost:8000/api/landing
+    # 1. Login dulu untuk dapat token
+    TOKEN=$(curl -X POST http://localhost:8000/api/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"edycoleee@gmail.com","password":"secret123"}' \
+      | jq -r '.access_token')
     
-    # Dengan token (success)
-    curl -H "Authorization: Bearer 123456" http://localhost:8000/api/landing
+    # 2. Access dashboard dengan token
+    curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/dashboard
     ```
     
-    Endpoint ini menggunakan middleware authentication.
-    Lihat middleware di bawah yang check Authorization header.
+    Endpoint ini menggunakan JWT middleware untuk authentication.
+    User info sudah di-set di request.state oleh middleware.
     """
     # Data user dari middleware (di-set di request.state)
     user_data = getattr(request.state, "user", None)
     
     return {
-        "message": "Welcome to the landing page!",
-        "description": "This is a protected endpoint - you need Bearer token to access",
+        "message": "Welcome to the dashboard!",
+        "description": "This is a protected endpoint - you need JWT token to access",
         "user": user_data,
-        "info": "Token ini sederhana, nanti akan diganti dengan JWT yang lebih secure"
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 
-# ==================== AUTHENTICATION MIDDLEWARE ====================
-# Middleware untuk check Bearer token pada endpoint tertentu
+@app.post("/api/auth/logout", tags=["Authentication"])
+async def logout():
+    """
+    LOGOUT - Endpoint untuk logout
+    
+    Note: Dengan JWT, logout biasanya dilakukan di client-side dengan menghapus token.
+    Server tidak perlu menyimpan state karena JWT stateless.
+    
+    Untuk invalidasi token di server, bisa:
+    1. Simpan blacklist token di Redis
+    2. Set expiry time yang pendek
+    3. Gunakan refresh token mechanism
+    
+    Cara test:
+    ```bash
+    curl -X POST http://localhost:8000/api/auth/logout
+    ```
+    """
+    return {
+        "message": "Logout successful",
+        "instruction": "Please delete the JWT token from client storage"
+    }
+
+
+# ==================== JWT AUTHENTICATION MIDDLEWARE ====================
+# Middleware untuk check JWT token pada endpoint tertentu
 
 @app.middleware("http")
-async def simple_auth_middleware(request: Request, call_next):
+async def jwt_auth_middleware(request: Request, call_next):
     """
-    Simple Authentication Middleware
+    JWT Authentication Middleware
     
     Cara kerja:
-    1. Check jika endpoint perlu authentication (hanya /api/landing)
-    2. Check Authorization header
-    3. Validasi Bearer token = "123456"
-    4. Jika valid, simpan user info di request.state
-    5. Jika tidak, return 401 Unauthorized
+    1. Check jika endpoint perlu authentication
+    2. Extract Bearer token dari Authorization header
+    3. Decode dan validasi JWT token
+    4. Query user dari database berdasarkan email di token
+    5. Jika valid, simpan user info di request.state
+    6. Jika tidak, return 401 Unauthorized
     
-    Ini adalah simulasi sederhana untuk belajar middleware.
-    Nanti akan diganti dengan JWT authentication yang lebih secure.
+    Protected endpoints:
+    - /api/dashboard
+    - /api/siswa/* (POST, PUT, DELETE)
     
     Mirip dengan Express.js:
     ```javascript
-    app.use((req, res, next) => {
-        if (req.path === '/api/landing') {
-            const token = req.headers.authorization;
-            if (token !== 'Bearer 123456') {
-                return res.status(401).json({error: 'Unauthorized'});
-            }
-            req.user = {username: 'admin'};
+    app.use(async (req, res, next) => {
+        if (protectedPaths.includes(req.path)) {
+            const token = req.headers.authorization?.replace('Bearer ', '');
+            const payload = jwt.verify(token, SECRET_KEY);
+            req.user = await User.findOne({email: payload.sub});
         }
         next();
     });
     ```
     """
     # Daftar endpoint yang perlu authentication
-    protected_paths = ["/api/landing"]
+    protected_paths = [
+        "/api/dashboard",
+    ]
     
-    # Check apakah endpoint perlu auth
-    if request.url.path in protected_paths:
-        # Ambil Authorization header
+    # Check juga berdasarkan method dan path pattern
+    path = request.url.path
+    method = request.method
+    
+    # Tambahkan endpoint siswa yang perlu auth (kecuali GET)
+    requires_auth = (
+        path in protected_paths or
+        (path.startswith("/api/siswa/") and method in ["POST", "PUT", "DELETE"])
+    )
+    
+    if requires_auth:
+        # Extract Authorization header
         auth_header = request.headers.get("Authorization")
+        token = extract_bearer_token(auth_header)
         
-        # Check format: "Bearer 123456"
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if not token:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={
                     "detail": "Missing or invalid Authorization header",
-                    "hint": "Use: Authorization: Bearer 123456"
+                    "hint": "Use: Authorization: Bearer <jwt_token>"
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Extract token
-        token = auth_header.replace("Bearer ", "")
+        # Decode JWT token
+        payload = decode_access_token(token)
         
-        # Validasi token (hardcoded untuk pembelajaran)
-        if token != "123456":
+        if not payload:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={
-                    "detail": "Invalid token",
-                    "hint": "Valid token is: 123456"
+                    "detail": "Invalid or expired token",
+                    "hint": "Please login again to get a new token"
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Token valid! Simpan user info di request.state
-        # Ini bisa diakses di endpoint handler
-        request.state.user = {
-            "username": "admin",
-            "role": "administrator",
-            "authenticated_at": "2026-02-05"
-        }
+        # Extract email dari token
+        email = payload.get("sub")
+        
+        if not email:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "detail": "Invalid token payload",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Query user dari database
+        from db_sqlalchemy import SessionLocal
+        db = SessionLocal()
+        try:
+            siswa = db.query(Siswa).filter(Siswa.email == email).first()
+            
+            if not siswa:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={
+                        "detail": "User not found",
+                    },
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            # Token valid! Simpan user info di request.state
+            request.state.user = {
+                "id": siswa.id,
+                "nama": siswa.nama,
+                "email": siswa.email,
+                "authenticated_at": datetime.utcnow().isoformat()
+            }
+        finally:
+            db.close()
     
     # Lanjutkan ke endpoint handler
     response = await call_next(request)

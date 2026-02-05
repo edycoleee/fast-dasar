@@ -18,12 +18,15 @@ class SiswaCreate(SiswaBase):
     Schema untuk membuat siswa baru (POST request)
     Inherit dari SiswaBase
     """
+    password: str = Field(..., min_length=6, description="Password siswa (min 6 karakter)")
+    
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "nama": "Edy Cole",
-                    "email": "edycoleee@gmail.com"
+                    "email": "edycoleee@gmail.com",
+                    "password": "secret123"
                 }
             ]
         }
@@ -35,12 +38,15 @@ class SiswaUpdate(SiswaBase):
     Schema untuk update siswa (PUT request)
     Inherit dari SiswaBase
     """
+    password: Optional[str] = Field(None, min_length=6, description="Password siswa (optional, min 6 karakter)")
+    
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "nama": "Edy Cole Updated",
-                    "email": "edy.updated@gmail.com"
+                    "email": "edy.updated@gmail.com",
+                    "password": "newsecret123"
                 }
             ]
         }
@@ -74,16 +80,16 @@ class SiswaResponse(SiswaBase):
 # ==================== AUTH SCHEMAS ====================
 
 class LoginRequest(BaseModel):
-    """Schema untuk login request"""
-    username: str = Field(..., min_length=1, description="Username untuk login")
+    """Schema untuk login request dengan email dan password"""
+    email: EmailStr = Field(..., description="Email untuk login")
     password: str = Field(..., min_length=1, description="Password untuk login")
     
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
-                    "username": "admin",
-                    "password": "admin"
+                    "email": "edycoleee@gmail.com",
+                    "password": "secret123"
                 }
             ]
         }
@@ -91,18 +97,24 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Schema untuk login response"""
+    """Schema untuk login response dengan JWT token"""
     message: str
-    token: str
-    username: str
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
     
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "message": "Login successful",
-                    "token": "123456",
-                    "username": "admin"
+                    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "token_type": "bearer",
+                    "user": {
+                        "id": 1,
+                        "nama": "Edy Cole",
+                        "email": "edycoleee@gmail.com"
+                    }
                 }
             ]
         }

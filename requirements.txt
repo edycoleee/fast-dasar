@@ -6,6 +6,10 @@ email-validator==2.1.0
 # Database ORM
 sqlalchemy==2.0.25
 
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
 # Testing
 pytest==7.4.4
 httpx==0.24.1
