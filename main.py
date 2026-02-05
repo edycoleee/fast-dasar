@@ -3,8 +3,9 @@ FastAPI Application dengan SQLAlchemy ORM
 Week 2a: CRUD siswa dengan SQLAlchemy
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List
@@ -12,12 +13,49 @@ from typing import List
 from db_sqlalchemy import Siswa, get_db, init_db
 from schemas import SiswaCreate, SiswaUpdate, SiswaResponse
 
+# Import middleware
+from middleware import (
+    request_logging_middleware,
+    ErrorHandlingMiddleware,
+    request_validation_middleware,
+    # RateLimitMiddleware,  # Uncomment jika mau pake rate limiting
+    # auth_middleware,  # Uncomment jika mau pake authentication
+)
+
 # Inisialisasi FastAPI app
 app = FastAPI(
     title="Siswa CRUD API - SQLAlchemy",
     description="API CRUD untuk manajemen data siswa dengan SQLAlchemy ORM",
     version="2.1.0"
 )
+
+# ==================== MIDDLEWARE SETUP ====================
+# Urutan penting! Middleware dijalankan dari atas ke bawah untuk request,
+# dan dari bawah ke atas untuk response
+
+# 1. CORS - Allow frontend to access API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 2. Error handling - Catch semua errors
+app.add_middleware(ErrorHandlingMiddleware)
+
+# 3. Request logging - Log semua requests
+app.middleware("http")(request_logging_middleware)
+
+# 4. Request validation - Validate request size & content-type
+app.middleware("http")(request_validation_middleware)
+
+# 5. Rate limiting (optional) - Batasi request per IP
+# app.add_middleware(RateLimitMiddleware, calls=100, period=60)
+
+# 6. Authentication (optional) - Require token untuk semua endpoints
+# app.middleware("http")(auth_middleware)
 
 
 # ==================== STARTUP & SHUTDOWN ====================
