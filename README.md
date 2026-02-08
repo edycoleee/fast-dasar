@@ -1,14 +1,12 @@
 # Belajar FastAPI - Panduan Tahapan
 
-## 🎯 Untuk Anda yang Sudah Familiar dengan Flask & Node.js
-
 FastAPI adalah framework modern Python yang menggabungkan kecepatan Node.js dengan kemudahan Flask, plus type safety dan auto-documentation!
 
 ---
 
 ## 📚 Tahapan Belajar FastAPI
 
-### **Tahap 1: Konsep Dasar (Yang Anda Lakukan Sekarang)**
+### **Tahap 1: Konsep Dasar**
 
 #### Perbedaan dengan Flask & Node.js:
 
@@ -149,6 +147,61 @@ data = {"nama": "Edy", "handphone": "08111111"}
 response = requests.post("http://127.0.0.1:8000/api/halo/", json=data)
 print(response.json())
 ```
+
+#### 4. **Gunakan Unit test :**
+
+FastAPI menyediakan `TestClient` untuk testing yang mudah:
+
+```python
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+
+# Test GET endpoint
+def test_halo_get():
+    response = client.get("/api/halo/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Halo! Welcome to FastAPI"}
+
+# Test POST endpoint
+def test_halo_post():
+    payload = {"nama": "Sultan", "handphone": "08123456789"}
+    response = client.post("/api/halo/", json=payload)
+    assert response.status_code == 200
+    assert response.json()["message"] == "Halo Sultan!"
+
+# Test validasi (error handling)
+def test_halo_post_validation_error():
+    payload = {"nama": "Sultan"}  # handphone missing
+    response = client.post("/api/halo/", json=payload)
+    assert response.status_code == 422  # Validation error
+```
+
+**Menjalankan test:**
+
+```bash
+# Jalankan semua test
+pytest
+
+# Dengan verbose output
+pytest -v
+
+# Jalankan file test tertentu
+pytest tests/test_main.py
+
+# Jalankan test dengan coverage
+pip install pytest-cov
+pytest --cov=. --cov-report=html
+```
+
+**Perbedaan dengan Flask/Express:**
+
+| Framework | Testing Library | Setup |
+|-----------|-----------------|-------|
+| Flask | `pytest` + `client` | Perlu setup app context |
+| Express | `jest` / `mocha` + `supertest` | Setup server manually |
+| FastAPI | `pytest` + `TestClient` | Paling simple & clean! |
 
 ---
 
