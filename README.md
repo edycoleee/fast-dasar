@@ -14,30 +14,48 @@ Pada tahap ini kita akan belajar membuat **CRUD API** yang proper dengan databas
 
 ---
 
-## 🏗️ Arsitektur Project
+## 🏗️ Arsitektur Project (Clean Architecture)
 
 ```
 fast-dasar/
-├── main.py                      # Entry point aplikasi
-├── models.py                    # Pydantic models (schema)
-├── database.py                  # Database operations (raw SQL)
+├── main.py                      # Entry point aplikasi (95 lines)
 ├── requirements.txt             # Dependencies
 ├── pytest.ini                   # Pytest configuration
-├── app/
-│   └── api/
-│       └── v1/
-│           └── endpoints/       # Future: API endpoints terpisah
-├── tests/
-│   ├── conftest.py             # Pytest setup
-│   └── test_main.py            # Unit & integration tests
-└── siswa.db                     # SQLite database
+│
+├── 📚 Documentation
+│   ├── ARCHITECTURE.md          # Architecture guide
+│   ├── QUICK_START.md           # Developer quick start
+│   ├── MIGRATION_REPORT.md      # Migration details
+│   ├── COMPLETION_SUMMARY.md    # Project completion
+│   └── DOCUMENTATION_INDEX.md   # Navigation guide
+│
+├── 📦 app/                      # Main application package
+│   ├── __init__.py
+│   ├── database.py              # Database operations (198 lines)
+│   ├── models.py                # Pydantic models (79 lines)
+│   └── api/v1/                  # API v1 implementation
+│       ├── __init__.py
+│       ├── api.py               # Router aggregator (13 lines)
+│       └── endpoints/
+│           ├── __init__.py
+│           ├── halo.py          # Greeting endpoints (~80 lines)
+│           └── siswa.py         # CRUD endpoints (~240 lines)
+│
+├── 🧪 tests/                    # Test package
+│   ├── conftest.py              # Pytest setup
+│   ├── test_main.py             # 14 integration tests
+│   └── __init__.py
+│
+└── siswa.db                     # SQLite database (auto-created)
 ```
 
 **Penjelasan:**
-- `main.py` - Mengimpor dan menjalankan app
-- `models.py` - Pydantic models untuk validasi request/response
-- `database.py` - Raw SQL queries untuk database operations
-- `tests/` - Comprehensive test cases untuk semua endpoint
+- `main.py` - Entry point aplikasi dengan lifespan setup
+- `app/database.py` - Raw SQL queries untuk database operations
+- `app/models.py` - Pydantic models untuk validasi request/response
+- `app/api/v1/endpoints/` - Modular endpoint routers (halo, siswa)
+- `app/api/v1/api.py` - Router aggregator dengan prefix `/api/v1`
+- `tests/` - Comprehensive test cases (14 tests, semua passing)
 
 ---
 
