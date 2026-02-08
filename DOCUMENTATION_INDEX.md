@@ -19,6 +19,15 @@ Welcome to the fast-dasar project! This document helps you navigate all the proj
 - Data flow diagram
 - Best practices implemented
 
+### For Understanding Dependency Injection ⭐ NEW
+👉 [DEPENDENCY_INJECTION_GUIDE.md](DEPENDENCY_INJECTION_GUIDE.md) - **Why FastAPI's DI is different from Flask & Node.js**
+- Detailed comparison: FastAPI vs Flask vs Node.js
+- How dependency injection works
+- Practical examples with all 3 frameworks
+- Testing with dependencies
+- Best practices for DI in FastAPI
+- **Perfect untuk understand: `@router.post("/") async def create_siswa(..., db: Session = Depends(get_db))`**
+
 ### For Migration Details
 👉 [MIGRATION_REPORT.md](MIGRATION_REPORT.md) - Detailed migration information
 - Before/after comparison
@@ -40,32 +49,39 @@ Welcome to the fast-dasar project! This document helps you navigate all the proj
 fast-dasar/
 │
 ├── 📖 Documentation (Start here!)
-│   ├── README.md ..................... Original project documentation
-│   ├── QUICK_START.md ............... Developer quick start guide
-│   ├── ARCHITECTURE.md .............. Detailed architecture guide
-│   ├── MIGRATION_REPORT.md .......... Migration details and analysis
-│   ├── COMPLETION_SUMMARY.md ........ Project completion overview
-│   └── DOCUMENTATION_INDEX.md ....... This file
+│   ├── README.md ................................ Original project documentation
+│   ├── QUICK_START.md .......................... Developer quick start guide
+│   ├── ARCHITECTURE.md ......................... Detailed architecture guide
+│   ├── DEPENDENCY_INJECTION_GUIDE.md .......... 🌟 FastAPI DI vs Flask vs Node.js
+│   ├── MIGRATION_REPORT.md ..................... Migration details and analysis
+│   ├── COMPLETION_SUMMARY.md .................. Project completion overview
+│   └── DOCUMENTATION_INDEX.md ................. This file
 │
 ├── 🚀 Main Application
-│   ├── main.py ...................... FastAPI app entry point (95 lines)
-│   ├── requirements.txt ............. Python dependencies
-│   └── pytest.ini ................... Pytest configuration
+│   ├── main.py ................................ FastAPI app entry point (95 lines)
+│   ├── requirements.txt ........................ Python dependencies
+│   └── pytest.ini ............................. Pytest configuration
 │
 ├── 📦 Application Code (app/)
-│   ├── __init__.py .................. Package marker
-│   ├── database.py .................. SQLite operations (198 lines)
-│   ├── models.py .................... Pydantic models (79 lines)
-│   └── api/v1/ ...................... API v1 implementation
+│   ├── __init__.py ............................. Package marker
+│   ├── database.py ............................ SQLAlchemy ORM + CRUD (198 lines)
+│   ├── models.py .............................. Pydantic models (79 lines)
+│   └── api/v1/ ................................ API v1 implementation
 │       ├── __init__.py
-│       ├── api.py ................... Router aggregator (13 lines)
-│       └── endpoints/ ............... Individual endpoint routers
-│           ├── halo.py ............. Greeting endpoints (~80 lines)
-│           └── siswa.py ............. CRUD endpoints (~240 lines)
+│       ├── api.py ............................. Router aggregator (13 lines)
+│       └── endpoints/ ......................... Individual endpoint routers
+│           ├── halo.py ....................... Greeting endpoints (~80 lines)
+│           └── siswa.py ...................... CRUD endpoints (~240 lines)
 │
-└── 🧪 Tests (tests/)
-    ├── conftest.py ................. Pytest configuration
-    └── test_main.py ................ 14 integration tests
+├── 🧪 Tests (tests/)
+│   ├── conftest.py ........................... Pytest configuration with ORM setup
+│   └── test_main.py .......................... 14 integration tests (all passing ✅)
+│
+└── 📚 SQLAlchemy Documentation
+    ├── SQLALCHEMY_MIGRATION.md ............... Complete ORM migration guide
+    ├── SQLALCHEMY_CHEATSHEET.md ............. Quick query patterns
+    ├── SQLALCHEMY_COMPLETE.md ............... Technical details & troubleshooting
+    └── RINGKASAN_SQLALCHEMY.md .............. Indonesian summary
 ```
 
 ## 🔍 Documentation by Purpose
@@ -76,6 +92,16 @@ fast-dasar/
 - Running the server
 - Testing the API
 - Common commands
+
+### "I want to understand FastAPI Dependency Injection" 🌟
+→ [DEPENDENCY_INJECTION_GUIDE.md](DEPENDENCY_INJECTION_GUIDE.md)
+- **Why FastAPI's DI is different from Flask and Node.js**
+- How `Depends(get_db)` works under the hood
+- Comparison with Flask's manual `get_db()` calls
+- Comparison with Node.js middleware approach
+- Practical examples in all 3 frameworks
+- Testing with dependency overrides
+- Best practices for clean code
 
 ### "I want to understand the code structure"
 → [ARCHITECTURE.md](ARCHITECTURE.md)

@@ -1,0 +1,116 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         DEPENDENCY INJECTION GUIDE - COMPREHENSIVE EXPLANATION             ║
+║         FastAPI vs Flask vs Node.js - Complete Comparison                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📄 FILE: DEPENDENCY_INJECTION_GUIDE.md (667 lines)
+
+📚 CONTENTS:
+
+1. INTRODUCTION (What is Dependency Injection?)
+   └─ Design pattern yang memisahkan "apa yang diperlukan" dari "cara mendapatkannya"
+
+2. PERBANDINGAN 3 FRAMEWORK (⭐ MAIN CONTENT)
+
+   ✅ Node.js (Express.js) - Middleware Pattern
+      ❌ Database passed through middleware
+      ❌ Tidak jelas dependencies dari function signature
+      ❌ Implicit, hard to debug
+
+   ⚠️ Flask - Manual Parameter Passing
+      ❌ Boilerplate: setiap endpoint harus panggil get_db()
+      ❌ Tidak type-safe
+      ❌ Global state (g object) - thread safety issues
+
+   ✨ FastAPI - Dependency Injection (Modern!)
+      ✅ Dependencies declared explicitly
+      ✅ Type-safe dengan type hints
+      ✅ IDE autocomplete works perfectly
+      ✅ Auto Swagger documentation
+      ✅ Easy testing dengan dependency override
+
+3. EXECUTION FLOW
+   └─ Step-by-step bagaimana DI bekerja di FastAPI
+   └─ Timeline dari request masuk sampai response sent
+
+4. DETAILED COMPARISON TABLE
+   └─ 8 aspek dibandingkan antara 3 framework
+
+5. IMPLEMENTASI DETAIL (Code Examples)
+   ├─ Simple Dependency (no cleanup)
+   ├─ Resource Dependency (dengan yield & cleanup)
+   ├─ Chained Dependencies (multiple levels)
+   └─ Optional Dependencies
+
+6. MASALAH DENGAN PENDEKATAN LAIN
+   └─ Node.js implicit dependencies problems
+   └─ Flask boilerplate repetition
+   └─ FastAPI solusi yang elegan
+
+7. TESTING COMPARISON
+   ├─ Node.js: Mock req object (Messy)
+   ├─ Flask: Context manager required (Complex)
+   └─ FastAPI: Simple dependency override (Clean!)
+
+8. CONTOH PRAKTIS: Authentication + Database
+   └─ 3 implementasi lengkap dalam 3 framework
+
+9. BEST PRACTICES
+   ├─ Keep dependencies focused
+   ├─ Use type hints
+   ├─ Error handling in dependencies
+   └─ Resource cleanup dengan try/finally
+
+10. KESIMPULAN & RINGKASAN
+    └─ FastAPI DI adalah modern, clean, dan powerful!
+
+════════════════════════════════════════════════════════════════════════════
+
+💡 KEY INSIGHTS:
+
+1. FastAPI DI Pattern:
+   
+   @router.post("/siswa")
+   async def create_siswa(
+       siswa: SiswaCreate,
+       db: Session = Depends(get_db)  # ← Magic!
+   ):
+       db.add(SiswaORM(...))
+       db.commit()
+
+2. Perbedaan Utama:
+   
+   Node.js:  implicit req.db  (hidden)
+   Flask:    manual get_db()  (repetitive)
+   FastAPI:  explicit Depends (clean)
+
+3. Testing:
+   
+   Node.js:  Mock req object      (complex)
+   Flask:    Context managers     (boilerplate)
+   FastAPI:  Override dependency  (simple)
+
+════════════════════════════════════════════════════════════════════════════
+
+🎯 KAPAN BACA FILE INI?
+
+✅ Ketika ingin memahami: `db: Session = Depends(get_db)`
+✅ Ketika compare dengan Flask/Node.js experience
+✅ Ketika ingin tahu WHY FastAPI lebih baik
+✅ Ketika belajar dependency injection pattern
+✅ Ketika setup testing dengan mocked dependencies
+
+════════════════════════════════════════════════════════════════════════════
+
+📍 LOCATION: /home/sultan/flask/fast-dasar/DEPENDENCY_INJECTION_GUIDE.md
+
+🔗 REFERENCES IN:
+   • README.md (added link to this guide)
+   • DOCUMENTATION_INDEX.md (added with ⭐ MARK)
+
+════════════════════════════════════════════════════════════════════════════
+
+✅ SIAP DIBACA DAN DIPELAJARI! 
+
+Ini adalah penjelasan paling lengkap tentang dependency injection di FastAPI
+dan bagaimana perbedaannya dengan framework lain.

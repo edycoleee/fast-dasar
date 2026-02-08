@@ -1368,6 +1368,7 @@ def test_create_siswa(client):
 ### Documentation Files
 
 Untuk pembelajaran lebih lanjut, baca:
+- [DEPENDENCY_INJECTION_GUIDE.md](DEPENDENCY_INJECTION_GUIDE.md) - **Penjelasan lengkap DI di FastAPI vs Flask vs Node.js** ⭐ BACA INI!
 - [SQLALCHEMY_MIGRATION.md](SQLALCHEMY_MIGRATION.md) - Complete guide with patterns
 - [SQLALCHEMY_CHEATSHEET.md](SQLALCHEMY_CHEATSHEET.md) - Quick reference
 - [SQLALCHEMY_COMPLETE.md](SQLALCHEMY_COMPLETE.md) - Technical details
