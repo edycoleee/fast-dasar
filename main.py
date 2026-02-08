@@ -6,6 +6,7 @@ Week 1b: CRUD siswa dengan SQLite menggunakan raw SQL
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from typing import List
+from contextlib import asynccontextmanager
 import sqlite3
 
 from models import SiswaCreate, SiswaUpdate, SiswaResponse
@@ -19,25 +20,38 @@ from database import (
     count_siswa
 )
 
-# Inisialisasi FastAPI app
+
+# ==================== Lifespan Event Handler (Modern Approach) ====================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager untuk startup dan shutdown events.
+    
+    Ini adalah cara modern (recommended oleh FastAPI) untuk menangani
+    startup dan shutdown events, menggantikan @app.on_event() yang deprecated.
+    
+    Sintaks:
+    - Code sebelum yield: jalankan saat startup
+    - Code sesudah yield: jalankan saat shutdown
+    """
+    # Startup event
+    init_db()
+    print("🚀 FastAPI app started with SQLite database")
+    
+    yield  # Aplikasi berjalan di sini
+    
+    # Shutdown event
+    print("👋 FastAPI app shutting down")
+
+
+# Inisialisasi FastAPI app dengan lifespan
 app = FastAPI(
     title="Siswa CRUD API",
     description="API CRUD untuk manajemen data siswa dengan SQLite",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
-
-# Initialize database saat startup
-@app.on_event("startup")
-async def startup_event():
-    """Inisialisasi database saat aplikasi start"""
-    init_db()
-    print("🚀 FastAPI app started with SQLite database")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup saat aplikasi shutdown"""
-    print("👋 FastAPI app shutting down")
 
 
 # ==================== CRUD ENDPOINTS ====================
