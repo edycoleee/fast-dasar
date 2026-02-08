@@ -6,81 +6,221 @@ FastAPI adalah framework modern Python yang menggabungkan kecepatan Node.js deng
 
 ---
 
-## 📚 Tahapan Belajar FastAPI
+## Belajar FastAPI
 
-### **Tahap 1: Konsep Dasar (Yang Anda Lakukan Sekarang)**
+### **Router - Mengorganisir Endpoints**
+
+#### Apa itu Router?
+
+Router adalah cara untuk **mengorganisir dan mengelompokkan endpoint** yang terkait. Ibaratnya seperti folder - kita tidak menyimpan semua file di folder akar, tapi diorganisir ke subfolder berdasarkan kategori.
+
+**Tanpa Router (buruk untuk project besar):**
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# Semua endpoint di satu file - berantakan!
+@app.get("/halo/")
+async def halo():
+    pass
+
+@app.post("/halo/")
+async def halo_post():
+    pass
+
+@app.get("/siswa/")
+async def siswa():
+    pass
+
+@app.get("/user/")
+async def user():
+    pass
+
+@app.post("/user/")
+async def user_post():
+    pass
+
+# ... ratusan endpoint lagi - CHAOS! 🤯
+```
+
+**Dengan Router (baik dan rapi):**
+```python
+from fastapi import FastAPI, APIRouter
+
+app = FastAPI()
+
+# Router untuk Halo endpoints
+halo_router = APIRouter(prefix="/halo", tags=["Halo"])
+
+@halo_router.get("/")
+async def halo():
+    pass
+
+@halo_router.post("/")
+async def halo_post():
+    pass
+
+# Router untuk Siswa endpoints
+siswa_router = APIRouter(prefix="/siswa", tags=["Siswa"])
+
+@siswa_router.get("/")
+async def siswa():
+    pass
+
+# Gabungkan semua router ke app
+app.include_router(halo_router)
+app.include_router(siswa_router)
+```
+
+#### Keuntungan Router:
+
+| Aspek | Tanpa Router | Dengan Router |
+|-------|--------------|---------------|
+| **Organisasi** | Berantakan | Rapi & modular |
+| **Reusability** | Sulit | Mudah |
+| **Maintainability** | Susah di-maintain | Mudah di-maintain |
+| **Skala besar** | Buruk | Sempurna |
+| **Team work** | Konflik merge | Minimal konflik |
+
+#### Parameter Router Penting:
+
+```python
+router = APIRouter(
+    prefix="/api/v1/siswa",        # Prefix URL
+    tags=["Siswa"],                # Tag di docs
+    responses={404: {"description": "Not found"}},  # Dokumentasi
+)
+```
+
+- **prefix**: URL base untuk semua endpoint di router ini
+  - Jika endpoint punya `/`, URL akhir: `/api/v1/siswa/`
+  - Menghemat pengetikan dan konsisten! ✅
+
+- **tags**: Untuk mengelompokkan di dokumentasi Swagger/ReDoc
+  - Membuat docs lebih rapi
+
+#### Struktur Folder Recommended:
+
+```
+project/
+├── main.py                 (main entry point)
+├── app/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── v1/
+│   │   │   ├── __init__.py
+│   │   │   ├── endpoints/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── halo.py      (router halo)
+│   │   │   │   └── siswa.py     (router siswa)
+│   │   │   └── api.py           (aggregator router)
+│   ├── models/             (database models)
+│   ├── schemas/            (pydantic models)
+│   ├── services/           (business logic)
+│   └── core/               (config, settings)
+└── tests/
+    └── test_main.py
+```
+
+#### Contoh Implementasi:
+
+**File: app/api/v1/endpoints/halo.py**
+```python
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/halo", tags=["Halo"])
+
+class HaloRequest(BaseModel):
+    nama: str
+    handphone: str
+
+@router.get("/")
+async def halo_get():
+    """Dapatkan ucapan halo"""
+    return {"success": True, "message": "Get from Halo API", "data": []}
+
+@router.post("/")
+async def halo_post(data: HaloRequest):
+    """Kirim nama dan handphone"""
+    return {
+        "message": f"Halo {data.nama}!",
+        "nama": data.nama,
+        "handphone": data.handphone
+    }
+```
+
+**File: app/api/v1/endpoints/siswa.py**
+```python
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/siswa", tags=["Siswa"])
+
+@router.get("/")
+async def siswa_get():
+    """Dapatkan data siswa"""
+    return {
+        "success": True,
+        "message": "Get from siswa API",
+        "data": [
+            {"no": 1, "nama": "Edy", "email": "edycoleee@gmail.com"}
+        ]
+    }
+```
+
+**File: app/api/v1/api.py**
+```python
+from fastapi import APIRouter
+from app.api.v1.endpoints import halo, siswa
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(halo.router)
+api_router.include_router(siswa.router)
+```
+
+**File: main.py**
+```python
+from fastapi import FastAPI
+from app.api.v1.api import api_router
+
+app = FastAPI(
+    title="Halo API",
+    description="API sederhana untuk belajar FastAPI",
+    version="1.0.0"
+)
+
+# Include router
+app.include_router(api_router)
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "FastAPI is running!"}
+```
+
+#### Hasil dengan Router:
+
+Sekarang URL endpoint adalah:
+- `/api/v1/halo/` (GET & POST)
+- `/api/v1/siswa/` (GET)
+
+Dan di dokumentasi Swagger, semua endpoint sudah terorganisir per tag! 📚
 
 #### Perbedaan dengan Flask & Node.js:
 
-| Aspek | Flask | Node.js/Express | FastAPI |
-|-------|-------|-----------------|---------|
-| Type Hints | ❌ Tidak wajib | ❌ Tidak (pakai TS) | ✅ Wajib & otomatis validasi |
-| Async/Await | ⚠️ Manual setup | ✅ Native | ✅ Native |
-| Validasi Data | Manual (Flask-RESTful) | Manual (Joi, etc) | ✅ Otomatis (Pydantic) |
-| Dokumentasi API | Manual (Swagger) | Manual (Swagger) | ✅ Auto-generate |
-| Performance | ~20k req/s | ~30k req/s | ~40k req/s |
+| Framework | Router | Syntax |
+|-----------|--------|--------|
+| **Flask** | Blueprint | `@blueprint.route()` |
+| **Express (Node.js)** | Router | `router.get()` / `router.post()` |
+| **FastAPI** | APIRouter | `router.get()` / `router.post()` |
 
-#### Yang Mirip:
-```python
-# Flask
-@app.route('/api/halo/', methods=['GET'])
-def halo():
-    return {"message": "Halo"}
-
-# Express (Node.js)
-app.get('/api/halo/', (req, res) => {
-    res.json({message: "Halo"});
-});
-
-# FastAPI
-@app.get("/api/halo/")
-async def halo():
-    return {"message": "Halo"}
-```
+Semuanya konsep yang sama - hanya nama dan syntax yang beda! ✨
 
 ---
 
-### **Tahap 2: Pydantic Models (Keunggulan Utama FastAPI)**
-
-```python
-# Ini yang membedakan FastAPI!
-class HaloRequest(BaseModel):
-    nama: str           # Wajib string
-    handphone: str      # Wajib string
-    umur: int = 0       # Opsional dengan default
-
-# FastAPI otomatis validasi:
-# ✅ Cek tipe data
-# ✅ Convert jika perlu
-# ✅ Return error 422 jika tidak valid
-```
-
-**Bandingkan dengan Flask:**
-```python
-# Flask - manual validation
-data = request.get_json()
-if not data or 'nama' not in data:
-    return {"error": "nama required"}, 400
-nama = data['nama']
-```
-
-**Bandingkan dengan Express:**
-```javascript
-// Express - perlu library tambahan
-const { body, validationResult } = require('express-validator');
-
-app.post('/api/halo/', 
-  body('nama').isString(),
-  (req, res) => {
-    const errors = validationResult(req);
-    // manual handling...
-  }
-);
-```
-
----
-
-### **Tahap 3: Instalasi & Menjalankan**
+### **Instalasi & Menjalankan**
 
 ```bash
 # 1. Buat virtual environment (best practice)
@@ -97,23 +237,10 @@ uvicorn main:app --reload
 # Server berjalan di: http://127.0.0.1:8000
 ```
 
-**Perbedaan dengan Flask/Node:**
-```bash
-# Flask
-flask run
-
-# Node.js
-node app.js
-# atau: nodemon app.js
-
-# FastAPI
-uvicorn main:app --reload
-# --reload: auto-restart saat file berubah (seperti nodemon)
-```
 
 ---
 
-### **Tahap 4: Testing API**
+### **Testing API**
 
 #### 1. **Gunakan Interactive Docs (GRATIS!)**
 
@@ -150,119 +277,108 @@ response = requests.post("http://127.0.0.1:8000/api/halo/", json=data)
 print(response.json())
 ```
 
----
+### Menjalankan test:
+```bash
+# Jalankan semua test
+pytest
 
-### **Tahap 5: Konsep Lanjutan (Next Steps)**
+# Dengan verbose output
+pytest -v
 
-Setelah menguasai dasar, lanjutkan dengan:
+# Jalankan file test tertentu
+pytest tests/test_main.py
 
-1. **Path Parameters & Query Parameters**
-   ```python
-   @app.get("/users/{user_id}")
-   async def get_user(user_id: int, skip: int = 0):
-       pass
-   ```
-
-2. **Database Integration** (SQLAlchemy/Tortoise ORM)
-   ```python
-   from sqlalchemy import create_engine
-   # Mirip dengan Sequelize di Node.js
-   ```
-
-3. **Authentication (JWT)**
-   ```python
-   from fastapi.security import OAuth2PasswordBearer
-   ```
-
-4. **Dependency Injection**
-   ```python
-   # Konsep unik FastAPI - sangat powerful!
-   @app.get("/items/")
-   async def read_items(commons: dict = Depends(common_parameters)):
-       pass
-   ```
-
-5. **Background Tasks**
-   ```python
-   from fastapi import BackgroundTasks
-   # Untuk email, logging, etc
-   ```
-
-6. **WebSockets**
-   ```python
-   @app.websocket("/ws")
-   async def websocket_endpoint(websocket: WebSocket):
-       pass
-   ```
+# Jalankan test dengan coverage
+pip install pytest-cov
+pytest --cov=. --cov-report=html
+```
 
 ---
 
-## 🚀 Quick Start
+### **Troubleshooting Pytest**
+
+#### Problem: `ModuleNotFoundError: No module named 'main'`
+
+**Apa yang terjadi?**
+
+Saat menjalankan pytest, Anda mungkin mendapat error:
+```
+E   ModuleNotFoundError: No module named 'main'
+```
+
+Ini terjadi karena pytest tidak bisa menemukan module `main.py` dari directory `tests/`.
+
+**Penyebab:**
+
+- Python path tidak dikonfigurasi dengan benar
+- Directory `tests/` bukan package (tidak ada `__init__.py`)
+- Pytest tidak tahu harus cari file dari directory mana
+
+**Solusi yang Sudah Diterapkan:**
+
+Saya sudah menambahkan 3 file konfigurasi:
+
+#### 1. **[pytest.ini](pytest.ini)** - Konfigurasi Pytest
+
+```ini
+[pytest]
+pythonpath = .
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+```
+
+**Penjelasan:**
+- `pythonpath = .`: Tambahkan root directory ke Python path
+- `testpaths = tests`: Pytest hanya cari test di folder `tests/`
+- `python_files = test_*.py`: Hanya file dengan prefix `test_` yang dianggap test file
+
+#### 2. **[tests/conftest.py](tests/conftest.py)** - Setup Path
+
+```python
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+```
+
+**Penjelasan:**
+- `conftest.py` dijalankan otomatis oleh pytest sebelum menjalankan test
+- Menambahkan project root ke `sys.path` agar bisa import `main`
+- Ini memastikan pytest bisa menemukan module di root directory
+
+#### 3. **[tests/__init__.py](tests/__init__.py)** - Make Tests a Package
+
+File kosong, tapi penting untuk membuat `tests` menjadi Python package.
+
+**Hasil:**
+
+Sekarang pytest bisa menemukan module `main` dan menjalankan semua test dengan benar! ✅
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+$ pytest -v
+collected 7 items
 
-# Run server
-uvicorn main:app --reload
-
-# Run tests
-pytest test_main.py -v
-
-# Run tests with coverage
-pytest test_main.py -v --cov=main --cov-report=term-missing
-
-# Open browser
-# Docs: http://127.0.0.1:8000/docs
-# API: http://127.0.0.1:8000/api/halo/
+tests/test_main.py::test_root PASSED
+tests/test_main.py::test_halo_get PASSED
+tests/test_main.py::test_halo_post_success PASSED
+...
+====== 7 passed in 0.84s ======
 ```
 
 ---
 
-## 📖 Resources
+#### Perbedaan Konfigurasi di Framework Lain:
 
-- **Official Docs**: https://fastapi.tiangolo.com/
-- **Tutorial**: https://fastapi.tiangolo.com/tutorial/
-- **GitHub**: https://github.com/tiangolo/fastapi
+| Framework | Solusi | File Konfigurasi |
+|-----------|--------|------------------|
+| **Flask** | Pakai `pytest-flask` fixture | `conftest.py` |
+| **FastAPI** | Pakai `TestClient` + path setup | `pytest.ini` + `conftest.py` |
+| **Express (Node.js)** | Pakai `jest` + setup file | `jest.config.js` |
 
----
-
-## 💡 Tips untuk Developer Flask/Node.js
-
-1. **Async is Optional**: Bisa pakai `def` biasa kalau tidak perlu async
-   ```python
-   @app.get("/sync")
-   def sync_endpoint():  # Tanpa async, tetap jalan
-       return {"message": "OK"}
-   ```
-
-2. **Type Hints is Key**: Manfaatkan type hints untuk validasi otomatis
-
-3. **Pydantic = Joi + Class Validator**: Satu library untuk semua validasi
-
-4. **Dependency Injection**: Konsep baru yang sangat berguna untuk reusable code
-
-5. **Auto Docs**: Jangan lupa dokumentasikan dengan docstring, otomatis masuk ke Swagger!
+FastAPI approach kita **lebih simple dan clean** karena TestClient langsung bisa test tanpa perlu setup kompleks! 🎉
 
 ---
-
-## 🎓 Learning Path
-
-```
-Week 1a: Router Basic siswa, halo
-@app.get("/api/halo/")
-async def halo():
-    return {"succes : true , message": "Get from Halo API", data : []}
-@app.get("/api/siswa/")
-async def siswa():
-    return {"succes : true , message": "Get from siswa API", data : [{no : 1, nama : edy, email : edycoleee@gmail.com}]}
-Week 1b: CRUD siswa sqlite SQL
-Week 2a: CRUD siswa sqlite Database Integration (SQLAlchemy)
-Week 2b: Middleware, Logger
-Week 3a: JWT Authentication 
-Week 3b: /dashboard /siswa >> admin,user Authorization
-Week 4: Advanced Features (WebSocket, Background Tasks)
-Week 5: Testing & Deployment docker 
-```
-
-Selamat belajar! 🚀
