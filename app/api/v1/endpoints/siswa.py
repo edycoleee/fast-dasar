@@ -1,18 +1,20 @@
 """
-Siswa CRUD Endpoints - Manajemen data siswa
+Siswa CRUD Endpoints - Manajemen data siswa dengan SQLAlchemy ORM
 """
 
-from fastapi import APIRouter, HTTPException, status
-import sqlite3
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.models import SiswaCreate, SiswaUpdate, SiswaResponse
 from app.database import (
+    get_db,
     get_all_siswa,
     get_siswa_by_id,
+    get_siswa_by_email,
     insert_siswa,
     update_siswa,
-    delete_siswa,
-    count_siswa
+    delete_siswa
 )
 
 
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/siswa", tags=["Siswa"])
 # ==================== CREATE ====================
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=SiswaResponse)
-async def create_siswa(siswa: SiswaCreate):
+async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
     """
     POST /api/v1/siswa/ - Tambah siswa baru
     
@@ -45,11 +47,21 @@ async def create_siswa(siswa: SiswaCreate):
         }
     """
     try:
-        siswa_id = insert_siswa(siswa.nama, siswa.email)
-        new_siswa = get_siswa_by_id(siswa_id)
+        # Cek apakah email sudah ada
+        existing_email = get_siswa_by_email(db, siswa.email)
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Email {siswa.email} sudah digunakan"
+            )
+        
+        # Insert siswa baru
+        new_siswa = insert_siswa(db, siswa.nama, siswa.email)
         
         return new_siswa
-    except sqlite3.IntegrityError:
+    except HTTPException:
+        raise
+    except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Email {siswa.email} sudah digunakan"
@@ -64,7 +76,7 @@ async def create_siswa(siswa: SiswaCreate):
 # ==================== READ ====================
 
 @router.get("/")
-async def read_all_siswa():
+async def read_all_siswa(db: Session = Depends(get_db)):
     """
     GET /api/v1/siswa/ - Ambil semua data siswa
     
@@ -85,13 +97,20 @@ async def read_all_siswa():
         }
     """
     try:
-        siswa_list = get_all_siswa()
+        siswa_list = get_all_siswa(db)
         total = len(siswa_list)
         
         return {
             "success": True,
             "message": f"Berhasil mengambil {total} data siswa",
-            "data": siswa_list
+            "data": [
+                {
+                    "id": siswa.id,
+                    "nama": siswa.nama,
+                    "email": siswa.email
+                }
+                for siswa in siswa_list
+            ]
         }
     except Exception as e:
         raise HTTPException(
@@ -101,7 +120,7 @@ async def read_all_siswa():
 
 
 @router.get("/{siswa_id}", response_model=SiswaResponse)
-async def read_siswa(siswa_id: int):
+async def read_siswa(siswa_id: int, db: Session = Depends(get_db)):
     """
     GET /api/v1/siswa/{id} - Ambil data siswa berdasarkan ID
     
@@ -123,7 +142,7 @@ async def read_siswa(siswa_id: int):
         }
     """
     try:
-        siswa = get_siswa_by_id(siswa_id)
+        siswa = get_siswa_by_id(db, siswa_id)
         
         if siswa is None:
             raise HTTPException(
@@ -131,7 +150,11 @@ async def read_siswa(siswa_id: int):
                 detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
             )
         
-        return siswa
+        return {
+            "id": siswa.id,
+            "nama": siswa.nama,
+            "email": siswa.email
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -144,7 +167,7 @@ async def read_siswa(siswa_id: int):
 # ==================== UPDATE ====================
 
 @router.put("/{siswa_id}", response_model=SiswaResponse)
-async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate):
+async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate, db: Session = Depends(get_db)):
     """
     PUT /api/v1/siswa/{id} - Update data siswa
     
@@ -172,29 +195,39 @@ async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate):
     """
     try:
         # Cek apakah siswa exists
-        existing_siswa = get_siswa_by_id(siswa_id)
+        existing_siswa = get_siswa_by_id(db, siswa_id)
         if existing_siswa is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Siswa dengan ID {siswa_id} tidak ditemukan"
             )
         
-        # Update siswa
-        success = update_siswa(siswa_id, siswa.nama, siswa.email)
+        # Cek apakah email sudah digunakan siswa lain
+        if existing_siswa.email != siswa.email:
+            email_taken = get_siswa_by_email(db, siswa.email)
+            if email_taken:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Email {siswa.email} sudah digunakan"
+                )
         
-        if not success:
+        # Update siswa
+        updated_siswa = update_siswa(db, siswa_id, siswa.nama, siswa.email)
+        
+        if not updated_siswa:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Gagal mengupdate siswa"
             )
         
-        # Get updated data
-        updated_siswa = get_siswa_by_id(siswa_id)
-        
-        return updated_siswa
+        return {
+            "id": updated_siswa.id,
+            "nama": updated_siswa.nama,
+            "email": updated_siswa.email
+        }
     except HTTPException:
         raise
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Email {siswa.email} sudah digunakan"
@@ -209,7 +242,7 @@ async def update_siswa_data(siswa_id: int, siswa: SiswaUpdate):
 # ==================== DELETE ====================
 
 @router.delete("/{siswa_id}")
-async def delete_siswa_data(siswa_id: int):
+async def delete_siswa_data(siswa_id: int, db: Session = Depends(get_db)):
     """
     DELETE /api/v1/siswa/{id} - Hapus siswa
     
@@ -232,7 +265,7 @@ async def delete_siswa_data(siswa_id: int):
     """
     try:
         # Cek apakah siswa exists
-        existing_siswa = get_siswa_by_id(siswa_id)
+        existing_siswa = get_siswa_by_id(db, siswa_id)
         if existing_siswa is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -240,7 +273,7 @@ async def delete_siswa_data(siswa_id: int):
             )
         
         # Delete siswa
-        success = delete_siswa(siswa_id)
+        success = delete_siswa(db, siswa_id)
         
         if not success:
             raise HTTPException(

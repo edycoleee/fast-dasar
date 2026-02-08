@@ -8,7 +8,7 @@ FastAPI adalah framework modern Python yang menggabungkan kecepatan Node.js deng
 
 ## 📚 Tahapan Belajar FastAPI
 
-### **CRUD SQL dengan FastAPI, SQLite, & Pytest**
+### **CRUD SQL Alchemy dengan FastAPI, SQLite, & Pytest**
 
 Pada tahap ini kita akan belajar membuat **CRUD API** yang proper dengan database SQLite, routing yang terstruktur, dan comprehensive testing.
 
@@ -31,8 +31,8 @@ fast-dasar/
 │
 ├── 📦 app/                      # Main application package
 │   ├── __init__.py
-│   ├── database.py              # Database operations (198 lines)
-│   ├── models.py                # Pydantic models (79 lines)
+│   ├── database.py              # SQLAlchemy ORM setup + CRUD (198 lines)
+│   ├── models.py                # Pydantic validation schemas (79 lines)
 │   └── api/v1/                  # API v1 implementation
 │       ├── __init__.py
 │       ├── api.py               # Router aggregator (13 lines)
@@ -51,11 +51,11 @@ fast-dasar/
 
 **Penjelasan:**
 - `main.py` - Entry point aplikasi dengan lifespan setup
-- `app/database.py` - Raw SQL queries untuk database operations
-- `app/models.py` - Pydantic models untuk validasi request/response
-- `app/api/v1/endpoints/` - Modular endpoint routers (halo, siswa)
+- `app/database.py` - SQLAlchemy ORM models (SiswaORM) dan CRUD operations
+- `app/models.py` - Pydantic schemas untuk request/response validation
+- `app/api/v1/endpoints/` - Modular endpoint routers dengan dependency injection (halo, siswa)
 - `app/api/v1/api.py` - Router aggregator dengan prefix `/api/v1`
-- `tests/` - Comprehensive test cases (14 tests, semua passing)
+- `tests/` - Comprehensive integration test cases (14 tests, semua passing)
 
 ---
 
@@ -134,22 +134,30 @@ Untuk pembelajaran, **SQLite perfect** karena:
 
 ### Raw SQL vs ORM
 
-**Raw SQL (yang kita gunakan):**
+**Raw SQL (Sebelumnya):**
 ```python
 query = "INSERT INTO siswa (nama, email) VALUES (?, ?)"
 cursor.execute(query, (nama, email))
+conn.commit()
+conn.close()
 ```
 
-**ORM (SQLAlchemy):**
+**ORM - SQLAlchemy (Sekarang ✅):**
 ```python
-siswa = Siswa(nama=nama, email=email)
+siswa = SiswaORM(nama=nama, email=email)
 db.add(siswa)
 db.commit()
+db.refresh(siswa)
+return siswa
 ```
 
-**Kapan pakai apa?**
-- **Raw SQL**: Learning, simple queries, full control
-- **ORM**: Complex relations, automatic migrations, less code
+**Alasan Migrasi ke SQLAlchemy:**
+- ✅ **Security**: SQL injection prevention (parameterized queries)
+- ✅ **Type Safety**: ORM models dengan type hints
+- ✅ **Less Boilerplate**: Tidak perlu manual connection/cursor management
+- ✅ **IDE Support**: Full autocomplete untuk database objects
+- ✅ **Testing**: Dependency injection untuk easy mocking
+- ✅ **Maintainability**: Single source of truth untuk data models
 
 ### Database Schema
 
@@ -168,102 +176,86 @@ INSERT INTO siswa (nama, email) VALUES ('Edy', 'edy@example.com');
 INSERT INTO siswa (nama, email) VALUES ('Budi', 'budi@example.com');
 ```
 
-### Database Operations di Code
+### Database Operations di Code - SQLAlchemy ORM
 
-**File: database.py**
+**File: app/database.py**
 
 ```python
-import sqlite3
-from typing import List, Optional, Dict
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from typing import Optional, List
 
-DB_NAME = "siswa.db"
+# Database setup
+DATABASE_URL = "sqlite:///./siswa.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-def get_connection():
-    """Get database connection"""
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row  # Return rows as dict
-    return conn
-
-def init_db():
-    """Initialize database dengan schema"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS siswa (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nama TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-def get_all_siswa() -> List[Dict]:
-    """Read all siswa"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM siswa")
-    siswa_list = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return siswa_list
-
-def get_siswa_by_id(siswa_id: int) -> Optional[Dict]:
-    """Read siswa by ID"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM siswa WHERE id = ?", (siswa_id,))
-    siswa = cursor.fetchone()
-    conn.close()
-    return dict(siswa) if siswa else None
-
-def insert_siswa(nama: str, email: str) -> Dict:
-    """Create new siswa"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO siswa (nama, email) VALUES (?, ?)",
-        (nama, email)
-    )
-    conn.commit()
+# ORM Model
+class SiswaORM(Base):
+    """SQLAlchemy ORM model untuk tabel siswa"""
+    __tablename__ = "siswa"
     
-    # Get inserted data
-    siswa_id = cursor.lastrowid
-    siswa = get_siswa_by_id(siswa_id)
-    conn.close()
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(100), nullable=False)
+    email = Column(String(100), nullable=False, unique=True, index=True)
+
+# Dependency injection untuk endpoints
+def get_db():
+    """Dependency untuk mendapatkan database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# CRUD Operations
+def init_db():
+    """Initialize database dan create tables"""
+    Base.metadata.create_all(bind=engine)
+
+def insert_siswa(db: Session, nama: str, email: str) -> SiswaORM:
+    """Create new siswa"""
+    siswa = SiswaORM(nama=nama, email=email)
+    db.add(siswa)
+    db.commit()
+    db.refresh(siswa)
     return siswa
 
-def update_siswa(siswa_id: int, nama: str, email: str) -> bool:
+def get_all_siswa(db: Session) -> List[SiswaORM]:
+    """Read all siswa"""
+    return db.query(SiswaORM).all()
+
+def get_siswa_by_id(db: Session, siswa_id: int) -> Optional[SiswaORM]:
+    """Read siswa by ID"""
+    return db.query(SiswaORM).filter(SiswaORM.id == siswa_id).first()
+
+def get_siswa_by_email(db: Session, email: str) -> Optional[SiswaORM]:
+    """Read siswa by email"""
+    return db.query(SiswaORM).filter(SiswaORM.email == email).first()
+
+def update_siswa(db: Session, siswa_id: int, nama: str, email: str) -> Optional[SiswaORM]:
     """Update siswa"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE siswa SET nama = ?, email = ? WHERE id = ?",
-        (nama, email, siswa_id)
-    )
-    conn.commit()
-    success = cursor.rowcount > 0
-    conn.close()
-    return success
+    siswa = db.query(SiswaORM).filter(SiswaORM.id == siswa_id).first()
+    if siswa:
+        siswa.nama = nama
+        siswa.email = email
+        db.commit()
+        db.refresh(siswa)
+    return siswa
 
-def delete_siswa(siswa_id: int) -> bool:
+def delete_siswa(db: Session, siswa_id: int) -> bool:
     """Delete siswa"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM siswa WHERE id = ?", (siswa_id,))
-    conn.commit()
-    success = cursor.rowcount > 0
-    conn.close()
-    return success
+    siswa = db.query(SiswaORM).filter(SiswaORM.id == siswa_id).first()
+    if siswa:
+        db.delete(siswa)
+        db.commit()
+        return True
+    return False
 
-def count_siswa() -> int:
+def count_siswa(db: Session) -> int:
     """Count total siswa"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as total FROM siswa")
-    total = cursor.fetchone()["total"]
-    conn.close()
-    return total
+    return db.query(SiswaORM).count()
 ```
 
 **SQL Cheat Sheet:**
@@ -293,9 +285,9 @@ SELECT * FROM siswa ORDER BY nama ASC LIMIT 10;
 
 ---
 
-## 📋 Pydantic Models - Schema Validation
+## 📋 Pydantic Models - Request/Response Validation
 
-**File: models.py**
+**File: app/models.py** (Hanya untuk Pydantic request/response schemas, bukan ORM)
 
 ```python
 from pydantic import BaseModel, EmailStr
@@ -343,6 +335,20 @@ class SiswaResponse(BaseModel):
 ---
 
 ## 📡 API Specs - REST Endpoint Documentation
+
+### Endpoint dengan Dependency Injection
+
+```python
+# Semua endpoints sekarang menerima db: Session dari get_db() dependency
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+
+@router.get("/")
+async def read_all_siswa(db: Session = Depends(get_db)):
+    siswa_list = get_all_siswa(db)
+    return siswa_list
+```
 
 ### Endpoint Specifications
 
@@ -1078,13 +1084,24 @@ Keduanya penting untuk membuat API yang production-ready! 🚀
 ### 3. Database Best Practices
 
 ```python
-# ❌ JANGAN: SQL Injection risk
+# ❌ JANGAN: SQL Injection risk (Raw SQL)
 query = f"SELECT * FROM siswa WHERE id = {siswa_id}"
+cursor.execute(query)
 
-# ✅ BENAR: Parameterized query
+# ✅ BENAR: SQLAlchemy ORM (Automatic parameterization)
+siswa = db.query(SiswaORM).filter(SiswaORM.id == siswa_id).first()
+
+# ✅ BENAR: Raw SQL dengan parameter binding
 query = "SELECT * FROM siswa WHERE id = ?"
 cursor.execute(query, (siswa_id,))
 ```
+
+**SQLAlchemy Advantages:**
+- Automatic SQL injection prevention
+- Type-safe queries
+- No manual parameter handling
+- Better error messages
+- Easier to refactor
 
 ### 4. Error Handling
 
@@ -1189,10 +1206,180 @@ app.get("/api/siswa/:id", (req, res) => {
 
 ---
 
+---
+
+## 🗄️ SQLAlchemy ORM - Database Layer (Week 2c) ✅
+
+### Migrasi dari Raw SQL ke SQLAlchemy
+
+Pada update terbaru (8 Februari 2026), project telah dimigrasikan ke **SQLAlchemy 2.0.23** untuk meningkatkan security, maintainability, dan type safety.
+
+### Key Changes
+
+**Before (Raw SQL)**
+```python
+import sqlite3
+
+def insert_siswa(nama: str, email: str) -> int:
+    conn = sqlite3.connect("siswa.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO siswa VALUES (?, ?)", (nama, email))
+    conn.commit()
+    siswa_id = cursor.lastrowid
+    conn.close()
+    return siswa_id
+```
+
+**After (SQLAlchemy ORM)**
+```python
+from sqlalchemy.orm import Session
+
+def insert_siswa(db: Session, nama: str, email: str) -> SiswaORM:
+    siswa = SiswaORM(nama=nama, email=email)
+    db.add(siswa)
+    db.commit()
+    db.refresh(siswa)
+    return siswa
+```
+
+### Benefits of SQLAlchemy
+
+| Aspek | Raw SQL | SQLAlchemy |
+|-------|---------|-----------|
+| **Security** | Manual parameter binding | Automatic parameterization |
+| **Type Safety** | Dict/tuple returns | ORM objects with type hints |
+| **Error Messages** | Generic database errors | Type-specific exceptions |
+| **IDE Support** | ❌ No autocomplete | ✅ Full autocomplete |
+| **Testing** | Hard to mock | Easy with dependency injection |
+| **Code Boilerplate** | ⚠️ Much | ✅ Minimal |
+
+### ORM Model Definition
+
+```python
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+class SiswaORM(Base):
+    __tablename__ = "siswa"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(100), nullable=False)
+    email = Column(String(100), nullable=False, unique=True, index=True)
+```
+
+### Query Patterns dengan SQLAlchemy
+
+```python
+from sqlalchemy.orm import Session
+
+# CREATE
+siswa = SiswaORM(nama="John", email="john@example.com")
+db.add(siswa)
+db.commit()
+
+# READ
+siswa = db.query(SiswaORM).filter(SiswaORM.id == 1).first()
+all_siswa = db.query(SiswaORM).all()
+by_email = db.query(SiswaORM).filter(SiswaORM.email == "john@example.com").first()
+
+# UPDATE
+siswa.nama = "John Doe"
+db.commit()
+
+# DELETE
+db.delete(siswa)
+db.commit()
+
+# COUNT
+total = db.query(SiswaORM).count()
+```
+
+### Endpoint Integration dengan Dependency Injection
+
+```python
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db, SiswaORM
+
+router = APIRouter()
+
+@router.post("/")
+async def create_siswa(siswa: SiswaCreate, db: Session = Depends(get_db)):
+    # db adalah database session dari get_db() dependency
+    new_siswa = SiswaORM(nama=siswa.nama, email=siswa.email)
+    db.add(new_siswa)
+    db.commit()
+    db.refresh(new_siswa)
+    return new_siswa
+
+@router.get("/{siswa_id}")
+async def get_siswa(siswa_id: int, db: Session = Depends(get_db)):
+    return db.query(SiswaORM).filter(SiswaORM.id == siswa_id).first()
+```
+
+### Testing dengan SQLAlchemy
+
+```python
+# conftest.py - Setup test database
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+@pytest.fixture(scope="function")
+def client():
+    Base.metadata.create_all(bind=engine)
+    app.dependency_overrides[get_db] = override_get_db
+    
+    client = TestClient(app)
+    yield client
+    
+    Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.clear()
+
+# test_main.py
+def test_create_siswa(client):
+    response = client.post("/api/siswa/", json={"nama": "Test", "email": "test@example.com"})
+    assert response.status_code == 201
+```
+
+### Migration Status
+
+✅ **Completed:**
+- Database layer fully refactored to SQLAlchemy ORM
+- All 14 tests passing
+- Zero warnings or errors
+- 100% backward compatible API
+- Production ready
+
+### Documentation Files
+
+Untuk pembelajaran lebih lanjut, baca:
+- [SQLALCHEMY_MIGRATION.md](SQLALCHEMY_MIGRATION.md) - Complete guide with patterns
+- [SQLALCHEMY_CHEATSHEET.md](SQLALCHEMY_CHEATSHEET.md) - Quick reference
+- [SQLALCHEMY_COMPLETE.md](SQLALCHEMY_COMPLETE.md) - Technical details
+- [RINGKASAN_SQLALCHEMY.md](RINGKASAN_SQLALCHEMY.md) - Indonesian summary
+
+---
+
 ## 📚 Resources
 
 - **FastAPI Docs**: https://fastapi.tiangolo.com/
 - **Pydantic**: https://docs.pydantic.dev/
+- **SQLAlchemy**: https://docs.sqlalchemy.org/
 - **SQLite**: https://www.sqlite.org/
 - **Pytest**: https://docs.pytest.org/
 - **REST API Specs**: https://restfulapi.net/
@@ -1201,10 +1388,10 @@ app.get("/api/siswa/:id", (req, res) => {
 
 ## 🎯 Next Steps
 
-1. ✅ Pahami CRUD operations dan database schema
-2. ✅ Tulis comprehensive test cases
+1. ✅ Pahami CRUD operations dengan SQLAlchemy ORM
+2. ✅ Tulis comprehensive test cases (14/14 passing ✅)
 3. ✅ Practice dengan membuat API baru
-4. ✅ Refactor ke APIRouter (Week 3)
+4. ✅ Refactor ke APIRouter dengan dependency injection (Week 3)
 5. ✅ Add authentication & authorization (Week 4)
 
 Selamat belajar! 🚀

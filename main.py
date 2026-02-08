@@ -1,6 +1,6 @@
 """
-FastAPI Application dengan CRUD SQLite
-Week 1b: CRUD siswa dengan SQLite menggunakan raw SQL
+FastAPI Application dengan CRUD SQLAlchemy ORM
+Week 1c: CRUD siswa dengan SQLite menggunakan SQLAlchemy ORM
 
 Architecture:
 - main.py: Entry point, setup lifespan dan include router
@@ -9,16 +9,17 @@ Architecture:
     - siswa.py: CRUD endpoints untuk siswa
     - halo.py: Simple greeting endpoints
   - api.py: Router aggregator
-- database.py: Database operations
-- models.py: Pydantic models
+- database.py: SQLAlchemy configuration dan ORM models
+- models.py: Pydantic request/response schemas
 """
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from fastapi import status
+from fastapi import status, Depends
 from contextlib import asynccontextmanager
+from sqlalchemy.orm import Session
 
-from app.database import init_db, count_siswa
+from app.database import init_db, SessionLocal, get_db, SiswaORM
 from app.api.v1.api import api_router
 
 
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI):
     """
     # ===== STARTUP =====
     init_db()
-    print("🚀 FastAPI app started with SQLite database")
+    print("🚀 FastAPI app started with SQLAlchemy ORM")
     
     yield  # App running
     
@@ -48,8 +49,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Siswa CRUD API",
-    description="API CRUD untuk manajemen data siswa dengan SQLite - v1.0",
-    version="1.0.0",
+    description="API CRUD untuk manajemen data siswa dengan SQLAlchemy - v2.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -62,13 +63,14 @@ app.include_router(api_router)
 # ==================== Root & Health Endpoints ====================
 
 @app.get("/")
-async def root():
+async def root(db: Session = Depends(get_db)):
     """Root endpoint dengan informasi API"""
-    total_siswa = count_siswa()
+    total_siswa = db.query(SiswaORM).count()
     
     return {
         "message": "Siswa CRUD API is running!",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "database": "SQLAlchemy ORM",
         "total_siswa": total_siswa,
         "documentation": {
             "swagger": "/docs",
@@ -82,10 +84,10 @@ async def root():
 
 
 @app.get("/api/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint untuk monitoring"""
     try:
-        total_siswa = count_siswa()
+        total_siswa = db.query(SiswaORM).count()
         return {
             "status": "healthy",
             "database": "connected",

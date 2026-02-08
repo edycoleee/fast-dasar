@@ -1,10 +1,5 @@
-from fastapi.testclient import TestClient
 import uuid
-
-from main import app
-
-
-client = TestClient(app)
+from conftest import client
 
 
 # Helper function untuk generate unique email
@@ -15,18 +10,19 @@ def generate_unique_email():
 
 # ==================== Test Root Endpoint ====================
 
-def test_root():
+def test_root(client):
     """Test GET / endpoint - informasi API"""
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert data["message"] == "Siswa CRUD API is running!"
-    assert data["version"] == "1.0.0"
+    assert data["version"] == "2.0.0"
+    assert data["database"] == "SQLAlchemy ORM"
     assert "endpoints" in data
     assert "total_siswa" in data
 
 
-def test_health_check():
+def test_health_check(client):
     """Test GET /api/health endpoint"""
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -38,7 +34,7 @@ def test_health_check():
 
 # ==================== Test HALO Endpoints ====================
 
-def test_halo_get():
+def test_halo_get(client):
     """Test GET /api/v1/halo/ - simple greeting"""
     response = client.get("/api/v1/halo/")
     assert response.status_code == 200
@@ -48,7 +44,7 @@ def test_halo_get():
     assert isinstance(data["data"], list)
 
 
-def test_halo_post():
+def test_halo_post(client):
     """Test POST /api/v1/halo/ - greeting dengan nama dan handphone"""
     payload = {
         "nama": "Edy Santoso",
@@ -64,7 +60,7 @@ def test_halo_post():
 
 # ==================== Test READ (GET) Endpoints ====================
 
-def test_get_all_siswa():
+def test_get_all_siswa(client):
     """Test GET /api/v1/siswa/ - mendapatkan semua siswa"""
     response = client.get("/api/v1/siswa/")
     assert response.status_code == 200
@@ -74,7 +70,7 @@ def test_get_all_siswa():
     assert isinstance(data["data"], list)
 
 
-def test_get_siswa_by_nonexistent_id():
+def test_get_siswa_by_nonexistent_id(client):
     """Test GET /api/v1/siswa/{id} - siswa tidak ditemukan"""
     response = client.get("/api/v1/siswa/99999")
     assert response.status_code == 404
@@ -84,7 +80,7 @@ def test_get_siswa_by_nonexistent_id():
 
 # ==================== Test CREATE (POST) Endpoint ====================
 
-def test_create_siswa_success():
+def test_create_siswa_success(client):
     """Test POST /api/v1/siswa/ - tambah siswa baru"""
     payload = {
         "nama": "Budi Santoso",
@@ -98,7 +94,7 @@ def test_create_siswa_success():
     assert "id" in data
 
 
-def test_create_siswa_missing_field():
+def test_create_siswa_missing_field(client):
     """Test POST /api/v1/siswa/ - field yang hilang (validation error)"""
     payload = {
         "nama": "Budi Santoso"
@@ -108,7 +104,7 @@ def test_create_siswa_missing_field():
     assert response.status_code == 422  # Validation error
 
 
-def test_create_siswa_invalid_email():
+def test_create_siswa_invalid_email(client):
     """Test POST /api/v1/siswa/ - email tidak valid"""
     payload = {
         "nama": "Budi Santoso",
@@ -118,7 +114,7 @@ def test_create_siswa_invalid_email():
     assert response.status_code == 422  # Validation error
 
 
-def test_create_siswa_duplicate_email():
+def test_create_siswa_duplicate_email(client):
     """Test POST /api/v1/siswa/ - email sudah terdaftar"""
     email = generate_unique_email()
     
@@ -141,7 +137,7 @@ def test_create_siswa_duplicate_email():
 
 # ==================== Test UPDATE (PUT) Endpoint ====================
 
-def test_update_siswa_nonexistent():
+def test_update_siswa_nonexistent(client):
     """Test PUT /api/v1/siswa/{id} - siswa tidak ditemukan"""
     payload = {
         "nama": "Updated Name",
@@ -151,7 +147,7 @@ def test_update_siswa_nonexistent():
     assert response.status_code == 404
 
 
-def test_update_siswa_missing_field():
+def test_update_siswa_missing_field(client):
     """Test PUT /api/v1/siswa/{id} - field yang hilang"""
     payload = {
         "nama": "Updated Name"
@@ -163,7 +159,7 @@ def test_update_siswa_missing_field():
 
 # ==================== Test DELETE Endpoint ====================
 
-def test_delete_siswa_nonexistent():
+def test_delete_siswa_nonexistent(client):
     """Test DELETE /api/v1/siswa/{id} - siswa tidak ditemukan"""
     response = client.delete("/api/v1/siswa/99999")
     assert response.status_code == 404
@@ -171,7 +167,7 @@ def test_delete_siswa_nonexistent():
 
 # ==================== Integration Test ====================
 
-def test_crud_workflow():
+def test_crud_workflow(client):
     """Test workflow lengkap: CREATE -> READ -> UPDATE -> DELETE"""
     
     # 1. CREATE - Tambah siswa baru
